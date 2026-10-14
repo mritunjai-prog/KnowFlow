@@ -1,258 +1,311 @@
-import { motion } from 'framer-motion';
-import { Plus, Filter, Search, Zap, UserPlus, Trash2, Archive, FileText, Clock, History, MoreVertical, Users } from 'lucide-react';
-
-const GlassCard = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
-  <div
-    className={`rounded-2xl transition-all duration-300 hover:-translate-y-1 ${className}`}
-    style={{
-      background: 'rgba(251, 233, 208, 0.45)',
-      backdropFilter: 'blur(14px)',
-      WebkitBackdropFilter: 'blur(14px)',
-      border: '1px solid rgba(144, 174, 173, 0.3)',
-      boxShadow: '0 4px 24px rgba(8, 50, 62, 0.06)',
-    }}
-  >
-    {children}
-  </div>
-);
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.08 } },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 24 },
-  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } },
-};
-
-const TASKS = [
-  {
-    id: 'KF-9921',
-    title: 'Review Q4 Market Correlates',
-    priority: 'High',
-    priorityColor: 'bg-secondary text-white',
-    status: 'New',
-    statusIcon: 'fiber_manual_record',
-    statusColor: 'text-primary',
-    actions: [
-      { icon: <Zap className="w-4 h-4" />, label: 'Process' },
-      { icon: <UserPlus className="w-4 h-4" />, label: 'Assign' },
-    ],
-    endAction: { icon: <Trash2 className="w-4 h-4" />, danger: true },
-    span: 1,
-  },
-  {
-    id: 'KF-8845',
-    title: 'Approve Neural-Link Specs',
-    priority: 'Medium',
-    priorityColor: 'bg-primary/80 text-white',
-    status: 'In-Progress',
-    statusIcon: 'pending',
-    statusColor: 'text-secondary',
-    actions: [
-      { icon: <motion.div animate={{ scale: [1,1.2,1] }} transition={{ repeat: Infinity, duration: 1.2 }}><Zap className="w-4 h-4" /></motion.div>, label: 'Process' },
-      { icon: <Users className="w-4 h-4" />, label: 'Team' },
-    ],
-    endAction: { icon: <Archive className="w-4 h-4" />, danger: false },
-    span: 1,
-  },
-  {
-    id: 'KF-7120',
-    title: 'Sync Learning Cluster Delta',
-    priority: 'Low',
-    priorityColor: 'bg-outline/30 text-on-surface-variant',
-    status: 'New',
-    statusIcon: 'fiber_manual_record',
-    statusColor: 'text-primary',
-    actions: [
-      { icon: <Zap className="w-4 h-4" />, label: 'Process' },
-      { icon: <UserPlus className="w-4 h-4" />, label: 'Assign' },
-    ],
-    endAction: { icon: <Trash2 className="w-4 h-4" />, danger: true },
-    span: 1,
-  },
-  {
-    id: 'KF-6632',
-    title: 'Archive Legacy Knowledge Nodes',
-    priority: 'Medium',
-    priorityColor: 'bg-outline/30 text-on-surface-variant',
-    status: 'Completed',
-    statusIcon: 'check_circle',
-    statusColor: 'text-outline',
-    actions: [
-      { icon: <FileText className="w-4 h-4" />, label: 'Report' },
-    ],
-    endAction: { icon: <History className="w-4 h-4" />, danger: false },
-    span: 1,
-  },
-];
-
-const FEATURED_TASK = {
-  id: 'KF-1042',
-  title: 'Biometric Data Governance Audit',
-  priority: 'High',
-  desc: 'Complete review of compliance protocols for the upcoming neural infrastructure upgrade. Requires immediate executive sign-off.',
-  status: 'Urgent',
-};
-
-export function Tasks() {
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useResource, useAction } from '../api/hooks';
+import { json, key, query, request } from '../api/client';
+import type { DocumentRecord, Task, Page as PageData } from '../api/types';
+import {
+  Page,
+  Panel,
+  Loading,
+  Empty,
+  ErrorNotice,
+  Field,
+  fieldClass,
+  Pager,
+  Dialog,
+  Notice,
+} from '../components/ui/Feedback';
+import { Button } from '../components/ui/Button';
+import { useFilters } from '../hooks/useFilters';
+function TaskForm({
+  task,
+  sourceId,
+  onDone,
+}: {
+  task?: Task;
+  sourceId?: string;
+  onDone: () => void;
+}) {
+  const [description, setDescription] = useState(task?.description || '');
+  const [priority, setPriority] = useState(task?.priority || 'medium');
+  const [dueDate, setDueDate] = useState(task?.dueDate || '');
+  const [documentId, setDocumentId] = useState(task?.source.documentId || sourceId || '');
+  const [search, setSearch] = useState('');
+  const [sourcePage, setSourcePage] = useState(1);
+  const docs = useResource<PageData<DocumentRecord>>(
+    !task ? `/documents${query({ q: search, page: sourcePage, pageSize: 20 })}` : null,
+  );
+  const action = useAction();
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="show"
-      className="max-w-6xl mx-auto px-6 py-10 space-y-10"
+    <form
+      className="space-y-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!description.trim()) return;
+        void action.run(
+          (signal) =>
+            request<Task>(task ? `/tasks/${key(task.id)}` : '/tasks', {
+              ...json(task ? 'PATCH' : 'POST', {
+                description: description.trim(),
+                priority,
+                dueDate: dueDate || null,
+                ...(!task ? { sourceDocumentId: documentId } : {}),
+              }),
+              signal,
+            }),
+          onDone,
+        );
+      }}
     >
-      {/* Header */}
-      <motion.div variants={itemVariants} className="flex items-start justify-between gap-6">
-        <div>
-          <h1 className="font-heading text-4xl font-bold text-primary tracking-tight mb-2">AI-Generated Tasks</h1>
-          <p className="text-on-surface-variant text-base max-w-2xl">
-            Real-time neural synthesis of critical operational nodes requiring manual validation or processing.
-          </p>
-        </div>
-        <div className="flex gap-3 shrink-0">
-          <button
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-sm text-primary hover:bg-primary/10 transition-all border border-outline/30"
-          >
-            <Filter className="w-4 h-4" />
-            Filter
-          </button>
-          <button
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-sm text-primary hover:bg-primary/10 transition-all border border-outline/30"
-          >
-            <Search className="w-4 h-4" />
-            Search
-          </button>
-        </div>
-      </motion.div>
-
-      {/* Featured Task */}
-      <motion.div variants={itemVariants}>
-        <div
-          className="p-8 rounded-2xl relative overflow-hidden"
-          style={{
-            background: 'linear-gradient(135deg, rgba(36,72,85,0.9) 0%, rgba(8,50,62,0.95) 100%)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(144,174,173,0.2)',
-            boxShadow: '0 16px 48px rgba(8,50,62,0.25)',
-          }}
+      <Field id="task-description" label="Task description">
+        <textarea
+          id="task-description"
+          className={fieldClass}
+          rows={3}
+          required
+          maxLength={2000}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+      </Field>
+      <Field id="task-priority" label="Priority">
+        <select
+          id="task-priority"
+          className={fieldClass}
+          value={priority}
+          onChange={(e) => setPriority(e.target.value as Task['priority'])}
         >
-          {/* Decorative orb */}
-          <div className="absolute top-0 right-0 w-80 h-80 rounded-full opacity-10 pointer-events-none"
-            style={{ background: 'radial-gradient(circle, #e64833, transparent 70%)', transform: 'translate(30%, -30%)' }} />
-
-          <div className="relative z-10">
-            <div className="flex items-start justify-between mb-4">
-              <span className="font-mono text-xs px-3 py-1.5 rounded-full uppercase tracking-wider bg-secondary/20 text-secondary border border-secondary/30">
-                ⚡ High Priority · Urgent
-              </span>
-              <span className="font-mono text-xs text-white/40">{FEATURED_TASK.id}</span>
-            </div>
-
-            <div className="flex items-start gap-8">
-              <div className="flex-1">
-                <h2 className="font-heading text-3xl font-bold text-white mb-3 leading-tight">
-                  {FEATURED_TASK.title}
-                </h2>
-                <p className="text-white/60 text-sm leading-relaxed max-w-xl mb-6">{FEATURED_TASK.desc}</p>
-                <div className="flex gap-3 flex-wrap">
-                  <button
-                    className="px-6 py-2.5 rounded-xl font-mono text-sm text-white active:scale-95 transition-all hover:opacity-90"
-                    style={{ background: 'linear-gradient(135deg, #e64833, #b62515)', boxShadow: '0 4px 16px rgba(182,37,21,0.4)' }}
-                  >
-                    Process Now
-                  </button>
-                  <button className="px-6 py-2.5 rounded-xl font-mono text-sm text-white border border-white/20 hover:bg-white/10 active:scale-95 transition-all">
-                    Details
-                  </button>
-                </div>
-              </div>
-              <div className="hidden lg:flex w-24 h-24 rounded-2xl items-center justify-center shrink-0"
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                <span className="material-symbols-outlined text-white/50 text-5xl" style={{ fontVariationSettings: "'wght' 200" }}>policy</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Task Grid */}
-      <div>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="font-heading text-xl font-semibold text-primary">All Tasks</h2>
-          <span className="font-mono text-xs text-on-surface-variant">{TASKS.length} pending</span>
-        </div>
-        <motion.div
-          variants={containerVariants}
-          className="grid grid-cols-1 md:grid-cols-2 gap-5"
-        >
-          {TASKS.map(task => (
-            <motion.div
-              key={task.id}
-              variants={itemVariants}
-              className="p-6 rounded-2xl flex flex-col justify-between min-h-[200px] group"
-              style={{
-                background: 'rgba(251, 233, 208, 0.45)',
-                backdropFilter: 'blur(14px)',
-                border: '1px solid rgba(144, 174, 173, 0.3)',
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+        </select>
+      </Field>
+      <Field id="task-due" label="Due date">
+        <input
+          id="task-due"
+          type="date"
+          className={fieldClass}
+          value={dueDate}
+          onChange={(e) => setDueDate(e.target.value)}
+        />
+      </Field>
+      {!task && (
+        <>
+          <Field id="source-search" label="Find source document">
+            <input
+              id="source-search"
+              type="search"
+              className={fieldClass}
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setSourcePage(1);
               }}
-              whileHover={{ y: -4, boxShadow: '0 16px 40px rgba(8,50,62,0.1)' }}
-              transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+            />
+          </Field>
+          {docs.loading && <Loading label="Loading source documents…" />}
+          <ErrorNotice error={docs.error} retry={docs.reload} />
+          <Field id="task-source" label="Source document">
+            <select
+              id="task-source"
+              required
+              className={fieldClass}
+              value={documentId}
+              onChange={(e) => setDocumentId(e.target.value)}
             >
-              <div>
-                <div className="flex items-start justify-between mb-3">
-                  <span className={`font-mono text-[10px] px-2.5 py-1 rounded-md uppercase tracking-wider ${task.priorityColor}`}>
-                    {task.priority} Priority
-                  </span>
-                  <span className="font-mono text-[10px] text-outline/60">{task.id}</span>
-                </div>
-                <h3 className="font-heading text-lg font-bold text-primary mb-2 group-hover:text-secondary transition-colors leading-tight">
-                  {task.title}
-                </h3>
-                <div className="flex items-center gap-2">
-                  <span className={`material-symbols-outlined ${task.statusColor}`} style={{ fontSize: '14px' }}>
-                    {task.statusIcon}
-                  </span>
-                  <span className="font-mono text-xs text-on-surface-variant">Status: {task.status}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between border-t border-glass-border pt-4 mt-4">
-                <div className="flex gap-2">
-                  {task.actions.map((action, i) => (
-                    <button
-                      key={i}
-                      title={action.label}
-                      className="p-2 rounded-lg text-white transition-all active:scale-90 hover:scale-105"
-                      style={{ background: i === 0 ? '#08323e' : 'transparent', border: i === 0 ? 'none' : '1px solid rgba(144,174,173,0.4)', color: i === 0 ? 'white' : '#08323e' }}
+              <option value="">Choose a document</option>
+              {documentId && !docs.data?.items.some((d) => d.id === documentId) && (
+                <option value={documentId}>Selected document ({documentId})</option>
+              )}
+              {docs.data?.items.map((doc) => (
+                <option key={doc.id} value={doc.id}>
+                  {doc.title}
+                </option>
+              ))}
+            </select>
+          </Field>
+          {docs.data && (
+            <Pager
+              page={docs.data.page}
+              total={docs.data.total}
+              pageSize={docs.data.pageSize}
+              onChange={setSourcePage}
+            />
+          )}
+        </>
+      )}
+      <ErrorNotice error={action.error} />
+      <Button type="submit" disabled={action.pending || (!task && !documentId)}>
+        {action.pending ? 'Saving…' : 'Save task'}
+      </Button>
+    </form>
+  );
+}
+export function Tasks() {
+  const filters = useFilters();
+  const search = new URLSearchParams(filters.params);
+  search.set('page', String(filters.page));
+  const result = useResource<PageData<Task>>(`/tasks?${search}`);
+  const action = useAction();
+  const [editing, setEditing] = useState<Task | 'new' | null>(null);
+  const [remove, setRemove] = useState<Task | null>(null);
+  return (
+    <Page
+      title="Tasks"
+      description="Turn extracted action items into next steps. Each task stays linked to its source."
+      actions={<Button onClick={() => setEditing('new')}>Add task</Button>}
+    >
+      <Panel>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field id="task-query" label="Search tasks">
+            <input
+              id="task-query"
+              className={fieldClass}
+              type="search"
+              value={filters.params.get('q') || ''}
+              onChange={(e) => filters.set('q', e.target.value)}
+            />
+          </Field>
+          <Field id="task-status" label="Status">
+            <select
+              id="task-status"
+              className={fieldClass}
+              value={filters.params.get('status') || ''}
+              onChange={(e) => filters.set('status', e.target.value)}
+            >
+              <option value="">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="completed">Completed</option>
+            </select>
+          </Field>
+          <Field id="task-source-filter" label="Source document ID">
+            <input
+              id="task-source-filter"
+              className={fieldClass}
+              value={filters.params.get('sourceId') || ''}
+              onChange={(e) => filters.set('sourceId', e.target.value)}
+            />
+          </Field>
+        </div>
+      </Panel>
+      <ErrorNotice error={result.error} retry={result.reload} />
+      <ErrorNotice error={action.error} />
+      <Notice>{action.message}</Notice>
+      {result.loading && <Loading />}
+      {result.data && (
+        <>
+          {!result.data.items.length ? (
+            <Empty>
+              No tasks match your filters. Tasks extracted from your notes will appear here.
+            </Empty>
+          ) : (
+            <ul className="grid gap-4 md:grid-cols-2">
+              {result.data.items.map((task) => (
+                <li key={task.id}>
+                  <Panel>
+                    <div className="flex items-start gap-3">
+                      <input
+                        id={`complete-${task.id}`}
+                        type="checkbox"
+                        checked={task.status === 'completed'}
+                        disabled={action.pending}
+                        className="mt-1 h-5 w-5 shrink-0 accent-secondary"
+                        onChange={() =>
+                          void action.run(
+                            (signal) =>
+                              request<Task>(`/tasks/${key(task.id)}`, {
+                                ...json('PATCH', {
+                                  status: task.status === 'completed' ? 'pending' : 'completed',
+                                }),
+                                signal,
+                              }),
+                            result.reload,
+                            'Task status updated.',
+                          )
+                        }
+                      />
+                      <label
+                        htmlFor={`complete-${task.id}`}
+                        className={`break-words text-lg font-semibold ${task.status === 'completed' ? 'line-through' : ''}`}
+                      >
+                        {task.description}
+                      </label>
+                    </div>
+                    <p className="mt-3 text-sm capitalize">
+                      {task.status} · {task.priority} priority ·{' '}
+                      {task.dueDate ? `Due ${task.dueDate}` : 'No due date'}
+                    </p>
+                    <Link
+                      className="mt-3 inline-block underline"
+                      to={`/document/${key(task.source.documentId)}`}
                     >
-                      {action.icon}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  className={`p-2 rounded-lg transition-all active:scale-90 ${task.endAction.danger ? 'text-on-surface-variant hover:text-error hover:bg-error/5' : 'text-on-surface-variant hover:text-primary hover:bg-primary/5'}`}
-                >
-                  {task.endAction.icon}
-                </button>
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
-      </div>
-
-      {/* FAB */}
-      <motion.button
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        className="fixed bottom-8 right-8 w-14 h-14 rounded-full text-white flex items-center justify-center shadow-2xl z-40"
-        style={{ background: 'linear-gradient(135deg, #e64833, #b62515)', boxShadow: '0 8px 32px rgba(182,37,21,0.4)' }}
-        title="Add Task"
-      >
-        <Plus className="w-6 h-6" />
-      </motion.button>
-    </motion.div>
+                      {task.source.title}
+                    </Link>
+                    <div className="mt-4 flex gap-2">
+                      <Button
+                        variant="secondary"
+                        disabled={action.pending}
+                        onClick={() => setEditing(task)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        disabled={action.pending}
+                        onClick={() => setRemove(task)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </Panel>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Pager
+            page={result.data.page}
+            total={result.data.total}
+            pageSize={result.data.pageSize}
+            onChange={(p) => filters.set('page', String(p))}
+          />
+        </>
+      )}
+      {editing && (
+        <Dialog
+          title={editing === 'new' ? 'Add source-linked task' : 'Edit task'}
+          onClose={() => setEditing(null)}
+        >
+          <TaskForm
+            task={editing === 'new' ? undefined : editing}
+            sourceId={filters.params.get('sourceId') || undefined}
+            onDone={() => {
+              setEditing(null);
+              result.reload();
+            }}
+          />
+        </Dialog>
+      )}
+      {remove && (
+        <Dialog title="Delete task?" onClose={() => setRemove(null)}>
+          <p className="mb-4">This removes the task, not its source document.</p>
+          <ErrorNotice error={action.error} />
+          <Button
+            disabled={action.pending}
+            onClick={() =>
+              void action.run(
+                (signal) => request<void>(`/tasks/${key(remove.id)}`, { method: 'DELETE', signal }),
+                () => {
+                  setRemove(null);
+                  result.reload();
+                },
+                'Task deleted.',
+              )
+            }
+          >
+            Confirm deletion
+          </Button>
+        </Dialog>
+      )}
+    </Page>
   );
 }

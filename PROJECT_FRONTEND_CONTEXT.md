@@ -1,261 +1,60 @@
-# PROJECT FRONTEND CONTEXT
-
-## 1. Executive Overview
-
-This frontend application is the user interface for **KnowFlow**, an enterprise-grade AI Knowledge Assistant and Intelligence Hub. It is designed with a premium, highly interactive aesthetic featuring dark modes, fluid WebGL shaders, glassmorphism, and micro-interactions.
-
-### Current Implementation Status
-The frontend is primarily a UI/UX prototype. Most components are fully responsive and visually complete but operate on hardcoded mock data. 
-- **Major Features Implemented**: Core routing, Global layout with sidebar, Fluid WebGL background shaders, 3D Canvas visualizers, Timeline with proximity-based framer-motion hover effects, Complex Capture dictation interface, and Dashboard analytics UI.
-- **Missing Features**: Backend API integration, global state management (e.g., Redux/Zustand), persistent authentication, and real-time database syncing.
-- **Overall Architecture**: A React Single Page Application (SPA) built with Vite. It uses `react-router-dom` for navigation, Tailwind CSS for utility-based styling, Framer Motion for complex animations, and Three.js/React Three Fiber for 3D visualizations.
-
----
-
-## 2. Technology Stack
-
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| **React** | 19.2.7 | Core UI library for building component-based architecture. |
-| **Vite** | 8.1.1 | Build tool and dev server. Chosen for extremely fast HMR and compilation. |
-| **Tailwind CSS** | 4.3.3 | Utility-first CSS framework for rapid styling without leaving JSX. |
-| **React Router** | 7.18.1 | Handles client-side routing and nested layouts. |
-| **Framer Motion** | 12.42.2 | Production-ready animation library used for page transitions, spring physics, and proximity hover effects. |
-| **Lucide React** | 1.25.0 | SVG icon library. |
-| **Three.js** | 0.185.1 | Low-level 3D graphics rendering. |
-| **React Three Fiber (R3F)** | 9.6.1 | React renderer for Three.js, used in `LandingHeroGraph` and `KnowledgeWeb`. |
-| **Recharts** | 3.9.2 | Composable charting library for dashboard analytics. |
-
----
-
-## 3. Repository Structure
-
-```text
-frontend/
-├── src/
-│   ├── components/
-│   │   ├── 3d/          # React Three Fiber & WebGL visualizers
-│   │   ├── layout/      # Shared layout wrappers (SidebarLayout)
-│   │   └── ui/          # Reusable, atomic UI components (Buttons, Cards, Shaders)
-│   ├── hooks/           # Custom React hooks (e.g., useProximityEffect)
-│   ├── pages/           # Route-level view components
-│   ├── App.css          # Core CSS (minimal)
-│   ├── App.tsx          # Root routing configuration
-│   ├── index.css        # Tailwind directives and base layer styles
-│   └── main.tsx         # Application entry point (React DOM render)
-├── package.json
-├── tailwind.config.ts   # Design tokens (colors, fonts, sizing)
-├── tsconfig.json
-└── vite.config.ts
-```
-
----
-
-## 4. Frontend Architecture
-
-### Routing Hierarchy
-The app uses a top-level `BrowserRouter` in `App.tsx`.
-- The root contains unauthenticated/marketing pages (`/`, `/login`, `/onboarding`).
-- A nested layout `<SidebarLayout>` wraps all internal application routes, providing a persistent sidebar navigation and a global fixed background canvas.
-
-```mermaid
-graph TD
-    App[App.tsx BrowserRouter] --> Public[Public Routes]
-    App --> Protected[SidebarLayout Wrapper]
-    
-    Public --> Landing[/]
-    Public --> Login[/login]
-    Public --> Onboarding[/onboarding]
-    
-    Protected --> Dashboard[/dashboard]
-    Protected --> Capture[/capture]
-    Protected --> Library[/library]
-    Protected --> DocDetail[/document/:id]
-    Protected --> Timeline[/timeline]
-    Protected --> Assistant[/assistant]
-    Protected --> Tasks[/tasks]
-    Protected --> Settings[/settings]
-```
-
----
-
-## 5. Routing Documentation
-
-| URL | Component | Layout | Purpose |
-|-----|-----------|--------|---------|
-| `/` | `Landing` | None | Marketing hero page with 3D Knowledge Web visualizer. |
-| `/login` | `Login` | None | User authentication. |
-| `/onboarding` | `Onboarding` | None | Initial user setup wizard with `Aurora` background. |
-| `/dashboard` | `Dashboard` | `SidebarLayout` | Core analytics and overview. |
-| `/capture` | `Capture` | `SidebarLayout` | Interface for ingesting knowledge (Dropzone, Voice, Text). |
-| `/library` | `Library` | `SidebarLayout` | Filterable list of stored knowledge documents. |
-| `/document/:id` | `DocumentDetail` | `SidebarLayout` | Deep-dive view of a single knowledge node. |
-| `/timeline` | `Timeline` | `SidebarLayout` | Chronological activity feed. |
-| `/assistant` | `Assistant` | `SidebarLayout` | Chat interface with the AI knowledge bot. |
-| `/tasks` | `Tasks` | `SidebarLayout` | Actionable items and pending validations. |
-| `/settings` | `Settings` | `SidebarLayout` | User configurations. |
-
----
-
-## 6. Layout Documentation
-
-### `SidebarLayout.tsx`
-- **Purpose**: Wraps all internal app pages. It mounts the persistent `ShaderBackground` at `z-index: 0` so it acts as a global animated wallpaper. It handles the state (`sidebarOpen`) for expanding/collapsing the navigation menu.
-- **Components Inside**: `LineSidebar` (custom animated nav), `ShaderBackground`, `Outlet` (react-router content).
-- **Responsive Behavior**: The sidebar animates its `width` from `256px` to `0px` using Framer Motion when toggled by the topbar header button.
+# KnowFlow Frontend Context
 
----
+Updated for Phase 4. Read `PROJECT_MEMORY.md` for authority, approvals, exact tooling additions and verification limits.
 
-## 7. Pages Documentation
+## Architecture
 
-### `Capture.tsx`
-- **Purpose**: Knowledge ingestion portal.
-- **Components Used**: `GlassCard`, `UploadCloud`, `Mic`.
-- **Layout**: 2-column desktop grid. Left column holds a File Drop Zone and Draft Text Intake. Right column holds a Voice Recording interface with animated waveform bars and metadata dropdowns.
-- **State Used**: `isRecording` (boolean), `isDragging` (boolean).
-- **Animations**: Waveform bars animate `height` via Framer Motion when `isRecording` is true.
+React/TypeScript SPA with Vite and React Router. App wraps routes in an error boundary, user-respecting MotionConfig, AuthProvider and Suspense. Public pages do not imply a working session; guarded routes wait for `/session`. Server-returned `user`/`admin` determines navigation and the Admin gate. Backend authorization is independently required.
 
-### `Dashboard.tsx`
-- **Purpose**: High-level system overview.
-- **Components Used**: `Recharts` (AreaChart), `CountUp`, `GlassCard`.
-- **Mock Data**: Hardcoded metrics for Active Nodes, Neural Links, Sync Rate, and Processing Load.
+| URL | Screen |
+|---|---|
+| `/` | Personal-product landing with optional-motion lazy raw Three.js hero |
+| `/login` | A single active sign-in or registration form; validated submission and safe return destination |
+| `/onboarding` | First capture, source review and question guide; completion persisted through API |
+| `/dashboard` | Personal counts, period activity/chart/table, topic coverage and defined nullable study time |
+| `/capture` | Batch upload/drop, clipboard/text, camera/audio, metadata and meeting association |
+| `/processing/:id` | Backend job polling, partial results, retry/cancel and artifact links |
+| `/library` | Canonical paginated/filterable document list and owned/shared filtering |
+| `/document/:id` | Authorized originals/preprocessed sources, extracted text/metadata, editing and owner grants |
+| `/meetings` | Meeting list/search/create |
+| `/meetings/:id` | Artifacts, tasks, decisions and summary/job action |
+| `/timeline` | Source-linked history grouped in the browser's local timezone |
+| `/assistant` | Paginated conversations, query/image context, evidence and source/page/region references |
+| `/tasks` | Personal source-linked create/edit/delete/complete, due dates, priorities and filters |
+| `/sharing` | Recipient invitation acceptance/decline and links to shared documents |
+| `/settings` | Profile, capture/model preferences and password update |
+| `/admin` | Admin-only configuration, storage/job counts and safe service-health information |
+| unmatched | Recoverable not-found page |
 
-### `Timeline.tsx`
-- **Purpose**: Shows chronological events.
-- **Animations**: Uses highly sophisticated `useMotionValue`, `useSpring`, and `useTransform` from Framer Motion to create a proximity-based hover effect that scales the dot and interpolates colors using CSS `color-mix` based on mouse distance.
+All nonpublic business routes above require a session and use SidebarLayout. There is no second, unused DocumentLibrary implementation. Shared documents are not shared workspaces.
 
-### `Library.tsx`
-- **Purpose**: Document repository.
-- **Animations**: Cards stagger in on load. Hovering a card lifts it on the Y-axis.
+## Data flow
 
----
+- `api/types.ts`: domain DTOs only; no provider SDK types or secrets.
+- `api/client.ts`: public API base, cookie credentials, in-memory CSRF token, JSON/multipart handling, 45-second timeout, cancellation, safe source URLs, errors and session-expiry signal.
+- `api/hooks.ts`: path-keyed cancellable resources; same-path refresh retains content, errors clear it, obsolete responses are ignored. Optional three-second polling checks a current flag and stops on terminal jobs. Actions prevent synchronous double submission, abort on unmount, and announce success only after server completion.
+- `auth/AuthContext.tsx` and `auth/context.ts`: server session plus immediate authentication override; refresh does not unnecessarily unmount a valid session. Guard errors display unavailability rather than fabricate login.
+- Local state holds unsaved forms/selections only. URL search parameters preserve filters/context. No production mock store or localStorage auth token exists.
+- Runtime response typing is not schema validation; backend contract/error/authorization tests are necessary when connecting the service.
 
-## 8. Component Documentation
+## UI and interaction primitives
 
-### UI Components
+`Feedback.tsx` provides Page/Panel, labels, loading/error/notice/empty feedback, pagination, native modal Dialog with focus restoration, not-found/access-denied and a render error boundary. `Button` uses explicit native props/default type and Framer Motion without unsafe type escapes. Sidebar links are actual NavLinks. The mobile drawer unmounts when closed; collapsed desktop navigation and inactive auth forms do not leave hidden focus targets.
 
-#### `LineSidebar.tsx`
-- **Purpose**: The primary navigation menu used inside `SidebarLayout`.
-- **Animations**: Uses Framer Motion's `useMotionValue` and `useTransform` to track mouse proximity (`pointerY`). As the user's cursor approaches an item, the line marker scales up, the text shifts to the right, and the colors interpolate smoothly. 
-- **Dependencies**: `framer-motion`.
+Capture validates types/limits against capabilities. Object URLs are revoked. Camera/audio streams, recorder callbacks and timers are cleaned up; late permission results stop their tracks. Recording uses the latest callback so simultaneous intake additions are not overwritten. Submit waits for active media capture to finish. Unchanged failed ingestions/queries reuse an idempotency key; success, changed content or a new operation changes it.
 
-#### `ShaderBackground.tsx`
-- **Purpose**: Renders a raw WebGL canvas that paints a fluid, noise-based shader.
-- **Styling**: `fixed inset-0 z-0 w-full h-full`.
-- **Usage**: Mounted once in `SidebarLayout`. It runs a raw `requestAnimationFrame` loop interacting directly with `gl.uniform1f`.
+Document text, messages and snippets render as React text, not injected HTML. Source URLs reject executable/data schemes. Images support native source viewing/zoom and audio has native controls; PDF links include the cited page. DOCX/PDF use the browser/download source link rather than adding an unapproved viewer library. The backend controls access/expiry and must serve safe file content types.
 
-#### `GlassCard.tsx`
-- **Purpose**: A reusable card wrapper implementing the glassmorphism aesthetic.
-- **Styling**: Uses `rgba(251, 233, 208, 0.5)` with `backdrop-filter: blur(20px)`.
+## Styling, assets and graphics
 
-#### `PixelCard.tsx`
-- **Purpose**: A visually complex card that creates a pixel-disintegration effect on hover using an internal HTML5 Canvas and `requestAnimationFrame`.
+Tailwind tokens remain based on slate/sand/umber/sage with a darker accessible action-red semantic value. Prefer existing utilities and shared controls. `index.css` has necessary global focus/reduced-motion rules; it is not forbidden to fix accessibility at the global layer. Typography uses an intentional system fallback, with no required remote font request. Controls use bundled Lucide icons.
 
-#### `Aurora.tsx`
-- **Purpose**: Renders slow-moving, heavily blurred background colored orbs (`bg-sage`, `bg-signal-red`, `bg-umber`) using Framer Motion. Used currently in `Onboarding`.
+Raw Three.js is only the retained landing graph; React Three Fiber/Drei were unused after cleanup and removed. The graph caps DPR, disposes meshes/materials/renderer, stops hidden/offscreen work and tolerates missing WebGL. ShaderBackground checks compile/link success, sizes on resize, disposes resources and uses a static sand fallback. CountUp uses motion values correctly and immediately shows the final value when motion/duration is disabled.
 
----
+Lazy routes isolate Recharts and Three.js. The remaining ~526 kB Three.js chunk warning is documented, not suppressed. Frame rate, heap growth over days and real-device GPU behavior are not certified by the browser regression suite.
 
-## 9. UI Design System
+## Test and deployment boundaries
 
-Defined primarily in `tailwind.config.ts`.
-- **Color Palette**: 
-  - `deep-slate` (#244855) - Primary dark background/text.
-  - `signal-red` (#E64833) - Primary accent/action color.
-  - `umber` (#874F41)
-  - `sage` (#90AEAD)
-  - `sand` (#FBE9D0) - Primary light background.
-  - Note: There are also Stitch-specific aliases (e.g., `primary`, `secondary`, `surface`).
-- **Typography**: 
-  - Heading: `"Space Grotesk"`
-  - Body: `"Inter"`
-  - Monospace: `"IBM Plex Mono"`
-- **Glassmorphism**: Achieved by combining translucent backgrounds (`rgba(..., 0.5)`), thin borders (`border-outline/30`), and heavy backdrop blurs (`backdrop-blur-xl`).
+See README for commands and `docs/PHASE_4_REPORT.md` for exact evidence. Browser fixtures live in `frontend/tests/fixtures.ts`, never in application imports. Test types are checked separately. Native-media success is simulated in unit tests; real permission-denial/fallback behavior is checked in Chromium.
 
----
-
-## 10. Styling Documentation
-
-- **Global Styles**: Defined in `index.css`. The `body` uses `@apply bg-sand text-deep-slate font-body;`.
-- **Note on Backgrounds**: To ensure the `ShaderBackground` canvas is visible, wrapper divs in `App.tsx` and `SidebarLayout.tsx` are intentionally left transparent (no background color).
-
----
-
-## 11. Animation Documentation
-
-- **Library**: `framer-motion` is the undisputed core of UI animations.
-- **Proximity Hover**: Found in `LineSidebar.tsx` and `Timeline.tsx`. It uses `e.clientY - rect.top` to calculate mouse distance to element centers, mapping that distance via `useTransform` to scale, color-mix, and translations.
-- **Page Transitions**: Handled via `variants` (e.g., `containerVariants`, `itemVariants`) using staggered children (`staggerChildren: 0.1`).
-- **WebGL**: `ShaderBackground` and `PixelCard` use native `requestAnimationFrame` for high-performance canvas mutations.
-
----
-
-## 12. State Management
-
-- **Local State**: `useState` is used extensively for localized interactions (e.g., sidebar toggling, recording state).
-- **Global State**: Not Found in Current Frontend. There is no Redux, Zustand, or Context API configured yet. Prop drilling is currently minimal because data is mocked per-page.
-
----
-
-## 13. Custom Hooks
-
-### `useProximityEffect.ts`
-- **Purpose**: Originally authored to handle DOM-based proximity math. 
-- **Current Status**: Deprecated/Unused. Both `LineSidebar` and `Timeline` have been refactored to use native `framer-motion` hooks (`useMotionValue`) which provide much better performance and cleaner React synchronization.
-
----
-
-## 14. Utility Functions
-
-- **`cn`** (in `Button.tsx`): A standard `clsx` and `tailwind-merge` wrapper used to safely concatenate conditional Tailwind classes.
-
----
-
-## 15. Forms Documentation
-
-- **Current Status**: Most forms (Login, Settings, Onboarding) are mocked. They use native HTML `<input>` and `<select>` elements but lack `onSubmit` handlers or form-validation libraries (like Zod or React Hook Form).
-- **Future API**: All form submissions will require integration with authentication APIs and data mutation endpoints.
-
----
-
-## 16. Data Flow
-
-- **Current Data**: Data is hardcoded as constants at the top of page components (e.g., `const TASKS = [...]` in `Tasks.tsx`).
-- **Future Integration**: The application will need a data-fetching layer (e.g., TanStack Query or native `fetch` inside `useEffect`) to pull real data.
-
----
-
-## 17. Performance
-
-- **Memoization**: Minimal. `useCallback` is used in a few custom canvas animations.
-- **Animations**: Intensive animations are offloaded to WebGL (Shaders) or CSS transforms via Framer Motion, ensuring 60fps performance without triggering React layout thrashing.
-- **Future Optimization**: Route-level code splitting (`React.lazy`) should be implemented as the application grows.
-
----
-
-## 18. Configuration Files
-
-- **`vite.config.ts`**: Barebones React Vite configuration.
-- **`tailwind.config.ts`**: Contains all brand tokens, custom colors, fonts, and fontSize scales.
-- **`package.json`**: Lists all dependencies. Note the inclusion of `@tailwindcss/postcss` for Tailwind CSS v4 support.
-
----
-
-## 19. AI Developer Guide
-
-- **Architecture Principles**: Prioritize visual excellence. Never use plain backgrounds if a glassmorphic or shader background makes sense.
-- **Component Patterns**: Always wrap page content in a `<motion.div>` with staggered entrance animations.
-- **Styling**: Do not modify `index.css` unless absolutely necessary. Rely entirely on Tailwind utility classes and the predefined tokens in `tailwind.config.ts`.
-- **Animations**: Do NOT use manual `requestAnimationFrame` loops for DOM elements. Always use `framer-motion` (`useMotionValue`, `useTransform`, `useSpring`) for complex interactive physics. Manual RAF loops are strictly reserved for `<canvas>` WebGL contexts.
-- **Routing**: New pages must be added to `App.tsx`. If they are authenticated app pages, they MUST be nested under the `<Route element={<SidebarLayout />}>` block.
-
----
-
-## 20. Current Progress Report
-
-- **Completed**: UI/UX Layout, Global Theming, Routing Structure, Proximity Animations, WebGL Shaders.
-- **Pending**: Backend Integration, Authentication Flow, State Management Setup.
-- **Next Recommended Steps**: 
-  1. Implement a global state store (Zustand).
-  2. Implement a data-fetching library (React Query).
-  3. Replace mocked JSON arrays in pages with API calls.
+`netlify.toml` is executable build/SPA/API-fallback configuration; `.env.example` distinguishes browser-public API base from Vite's server-side proxy target. Real Render proxy/cookies/CSRF/private caching/provider setup is explained in `docs/BACKEND_HANDOFF.md`. No provider, backend framework, database or live credentials have been selected by this frontend work.

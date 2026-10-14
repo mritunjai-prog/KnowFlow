@@ -1,91 +1,31 @@
 # KnowFlow Agent Configuration
-_Rules and workflows for AI agents working on this project._
 
-## Session Startup Protocol
-1. Read `PROJECT_MEMORY.md` first — contains full project context, BRD summary, tech stack, routing, status
-2. Read `PROJECT_FRONTEND_CONTEXT.md` — detailed frontend architecture documentation
-3. Check `.mimocode/settings.json` — MCP server configuration
-4. Verify Google Stitch MCP is connected (restart session if needed)
+## Start here
 
-## Project Identity
-**KnowFlow** is an Enterprise AI Knowledge Assistant. This is a **frontend-only prototype** currently. The BRD defines a full-stack system with Python backend, OpenCV, ML, and RAG pipeline.
+1. Read `PROJECT_MEMORY.md`, then `PROJECT_FRONTEND_CONTEXT.md`.
+2. Read the user's current phase/approval and actual relevant BRD sections before changing scope.
+3. Check the working tree and actual files. Historical mock screenshots/design exports are not implementation requirements.
 
-## Work Priorities (from BRD)
-1. **Backend API** — Python FastAPI (recommended) with endpoints for:
-   - Image upload + OCR processing
-   - Document ingestion (PDF, DOCX, text)
-   - ML classification and topic tagging
-   - RAG query endpoint
-   - Task management CRUD
-   - User authentication
-2. **State Management** — Zustand stores for:
-   - Auth state
-   - Documents/library
-   - Tasks
-   - Chat/assistant
-3. **Data Fetching** — React Query (TanStack Query) for:
-   - API integration
-   - Caching
-   - Optimistic updates
-4. **Replace Mock Data** — All pages currently use hardcoded constants
+## Authority and scope
 
-## Code Style Rules
-- **No comments** unless WHY is non-obvious
-- **No emojis** in code or files
-- **Tailwind utilities only** — no custom CSS unless absolutely necessary
-- **Framer Motion** for all DOM animations — no manual RAF for DOM elements
-- **WebGL/Canvas** — raw RAF is fine for shader/canvas contexts
-- **Component pattern**: `motion.div` wrapper with staggered entrance variants
-- **Class merging**: Use `cn()` utility (clsx + tailwind-merge)
-- **Responsive**: Mobile-first Tailwind breakpoints
-- **Accessibility**: Semantic HTML, proper ARIA labels
+KnowFlow is a **personal** knowledge/productivity hub. BRD requirements plus explicit user decisions outrank stale README/design descriptions. All BRD features, including future extensions, are mandatory for the target application. Collaboration was explicitly clarified as selected-document view/edit sharing, not shared workspaces.
 
-## File Conventions
-- **Pages**: `src/pages/<Name>.tsx` — route-level components
-- **UI Components**: `src/components/ui/<Name>.tsx` — reusable atoms
-- **3D Components**: `src/components/3d/<Name>.tsx` — React Three Fiber
-- **Layout**: `src/components/layout/<Name>.tsx` — structural wrappers
-- **Hooks**: `src/hooks/<name>.ts` — custom React hooks
+Phase 4 is frontend plus provider-neutral backend contract; backend implementation comes later. Phase 5 requires separate approval. Do not claim live persistence, ML/AI results or production authorization when no backend is connected.
 
-## Design Tokens (tailwind.config.ts)
-| Token | Hex | Usage |
-|-------|-----|-------|
-| `deep-slate` | #244855 | Primary dark, text |
-| `signal-red` | #E64833 | Accent, actions |
-| `umber` | #874F41 | Secondary accent |
-| `sage` | #90AEAD | Subtle accent |
-| `sand` | #FBE9D0 | Light background |
+Keep existing React/TypeScript/browser runtime facilities. Do not add Zustand, TanStack Query, Zod, form libraries or provider SDKs without approval. Approved **dev-only regression** dependencies and exact reasons are in PROJECT_MEMORY.md. Frontend deploys to Netlify; backend to Render; all secrets/adapters remain server-side.
 
-## Key Files Reference
-| File | Purpose |
-|------|---------|
-| `App.tsx` | Root router — add new routes here |
-| `SidebarLayout.tsx` | Wraps all authenticated pages |
-| `LineSidebar.tsx` | Main navigation with proximity hover |
-| `ShaderBackground.tsx` | Global WebGL animated wallpaper |
-| `GlassCard.tsx` | Reusable glassmorphism card |
-| `tailwind.config.ts` | All design tokens |
-| `package.json` | Dependencies |
+## Code conventions
 
-## MCP Tools Available
-- **Google Stitch** — Design tool integration via MCP remote server
-  - Config: `.mimocode/settings.json`
-  - Endpoint: `https://stitch.googleapis.com/mcp`
-  - Use for: Design assets, UI components, visual elements
+- Use route-level pages under `frontend/src/pages`, shared UI under `components/ui`, layout under `components/layout`, and existing hooks/client/DTO boundaries.
+- Add routes in `App.tsx`; business screens need RequireAuth/SidebarLayout, with a separate Admin gate where appropriate.
+- Use semantic links/buttons/labels, visible focus and explicit loading/error/empty states. Hidden navigation/forms must not stay focusable.
+- Keep Tailwind design tokens/shared controls consistent; use `cn` where conditional merging needs it. Necessary global accessibility fixes in index.css are permitted.
+- Use Framer Motion for DOM animations and honor reduced motion. Canvas/WebGL may use RAF with complete cleanup and visibility suspension. Retained 3D uses raw Three.js, not R3F.
+- No unsafe type casts to bypass business errors. No runtime mock success. Server-returned text must not become active HTML.
+- Comments should explain non-obvious reasons, not restate code. Avoid unrelated refactoring, unnecessary dependencies and unused decorative controls.
 
-## Architecture Notes (from BRD)
-- **Frontend**: React SPA (currently), could expand to full-stack
-- **Backend**: Python FastAPI recommended
-- **Processing**: OpenCV for image preprocessing, Tesseract for OCR
-- **ML**: Transformer models for classification, topic modeling, action detection
-- **RAG**: LangChain or custom pipeline with embeddings + vector DB
-- **Storage**: PostgreSQL (metadata) + FAISS/Chroma/Qdrant (vectors)
-- **LLM**: API integration for summarization, Q&A, task extraction
+## Verification and handoff
 
-## Do NOT
-- Commit/push unless explicitly asked
-- Modify `index.css` unless absolutely necessary
-- Use plain backgrounds where glassmorphic/shader works
-- Add features beyond what's requested
-- Add comments explaining what code does (names should do that)
-- Create documentation unless asked
+Run build, strict lint, test types, unit tests, contract check, dependency audit and browser regressions for affected workflows. Keep generated OpenAPI synchronized with DTOs and operation semantics. Report actual results and remaining backend/hardware/browser limits; no unsupported compliance, SLA, accuracy or 60fps claims.
+
+Update the approved memory/report when meaningful state changes. Do not commit, push, deploy, start the next phase or introduce new scope unless authorized. Tool connections must be checked in the actual environment; an old MCP config is not proof that a design service is connected or required.

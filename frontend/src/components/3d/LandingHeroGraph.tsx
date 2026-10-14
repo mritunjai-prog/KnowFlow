@@ -1,20 +1,27 @@
 import { useEffect, useRef } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import * as THREE from 'three';
 
 export function LandingHeroGraph() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const reduced = useReducedMotion();
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
+    if (!container || reduced) return;
 
     const width = container.clientWidth || window.innerWidth;
     const height = container.clientHeight || window.innerHeight;
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    renderer.setPixelRatio(window.devicePixelRatio);
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    } catch {
+      return;
+    }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(width, height);
     container.appendChild(renderer.domElement);
 
@@ -24,8 +31,13 @@ export function LandingHeroGraph() {
 
     // Knowledge Graph Nodes (Spheres)
     const nodesCount = 150;
-    const nodes: { mesh: THREE.Mesh, originalPos: THREE.Vector3, offset: number, velocity: THREE.Vector3 }[] = [];
-    
+    const nodes: {
+      mesh: THREE.Mesh;
+      originalPos: THREE.Vector3;
+      offset: number;
+      velocity: THREE.Vector3;
+    }[] = [];
+
     // Core node
     const coreGeometry = new THREE.IcosahedronGeometry(1.5, 1);
     const coreMaterial = new THREE.MeshPhongMaterial({
@@ -34,54 +46,54 @@ export function LandingHeroGraph() {
       emissiveIntensity: 0.5,
       wireframe: true,
       transparent: true,
-      opacity: 0.8
+      opacity: 0.8,
     });
     const coreMesh = new THREE.Mesh(coreGeometry, coreMaterial);
     graphGroup.add(coreMesh);
 
     const nodeGeometry = new THREE.SphereGeometry(0.12, 12, 12);
-    
+
     // Use colors from the design system: #e64833 (Coral), #244855 (Teal), #90aead (Outline)
     const colors = [0xe64833, 0x244855, 0x90aead];
 
     for (let i = 0; i < nodesCount; i++) {
       const color = colors[Math.floor(Math.random() * colors.length)];
-      const material = new THREE.MeshPhongMaterial({ 
-        color: color, 
+      const material = new THREE.MeshPhongMaterial({
+        color: color,
         emissive: color,
         emissiveIntensity: 0.4,
-        shininess: 100 
+        shininess: 100,
       });
       const node = new THREE.Mesh(nodeGeometry, material);
-      
+
       // Position in a larger loose spherical cloud
       const phi = Math.acos(-1 + (2 * i) / nodesCount);
       const theta = Math.sqrt(nodesCount * Math.PI) * phi;
       const radius = 3 + Math.random() * 6;
-      
+
       node.position.set(
         radius * Math.cos(theta) * Math.sin(phi),
         radius * Math.sin(theta) * Math.sin(phi),
-        radius * Math.cos(phi)
+        radius * Math.cos(phi),
       );
-      
+
       graphGroup.add(node);
       nodes.push({
         mesh: node,
         originalPos: node.position.clone(),
         offset: Math.random() * Math.PI * 2,
-        velocity: new THREE.Vector3()
+        velocity: new THREE.Vector3(),
       });
     }
 
     // Dynamic Connections (Lines)
-    const lineMaterial = new THREE.LineBasicMaterial({ 
-      color: 0x244855, 
-      transparent: true, 
-      opacity: 0.15 
+    const lineMaterial = new THREE.LineBasicMaterial({
+      color: 0x244855,
+      transparent: true,
+      opacity: 0.15,
     });
     const connectionThreshold = 2.5;
-    const lines: { line: THREE.Line, i: number, j: number }[] = [];
+    const lines: { line: THREE.Line; i: number; j: number }[] = [];
 
     // Pre-calculate pairs to avoid O(n^2) every frame
     const pairs: [number, number][] = [];
@@ -94,20 +106,20 @@ export function LandingHeroGraph() {
     }
 
     pairs.forEach(([i, j]) => {
-        const geometry = new THREE.BufferGeometry().setFromPoints([
-          nodes[i].mesh.position, 
-          nodes[j].mesh.position
-        ]);
-        const line = new THREE.Line(geometry, lineMaterial);
-        graphGroup.add(line);
-        lines.push({ line, i, j });
+      const geometry = new THREE.BufferGeometry().setFromPoints([
+        nodes[i].mesh.position,
+        nodes[j].mesh.position,
+      ]);
+      const line = new THREE.Line(geometry, lineMaterial);
+      graphGroup.add(line);
+      lines.push({ line, i, j });
     });
 
     // Lighting
     const pointLight = new THREE.PointLight(0xe64833, 2, 50);
     pointLight.position.set(0, 0, 0); // inside core
     scene.add(pointLight);
-    
+
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     scene.add(ambientLight);
 
@@ -116,7 +128,7 @@ export function LandingHeroGraph() {
     // Mouse Interaction
     const mouse = new THREE.Vector2();
     const targetMouse = new THREE.Vector2();
-    
+
     const handleMouseMove = (event: MouseEvent) => {
       targetMouse.x = (event.clientX / window.innerWidth) * 2 - 1;
       targetMouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -124,8 +136,13 @@ export function LandingHeroGraph() {
     window.addEventListener('mousemove', handleMouseMove);
 
     let time = 0;
-    let animationId: number;
+    let animationId = 0;
+    let visible = true;
     function animate() {
+      if (document.hidden || !visible || renderer.getContext().isContextLost()) {
+        animationId = 0;
+        return;
+      }
       animationId = requestAnimationFrame(animate);
       time += 0.01;
 
@@ -160,7 +177,7 @@ export function LandingHeroGraph() {
         const targetX = n.originalPos.x + Math.sin(time * 2 + n.offset) * 0.3;
         const targetY = n.originalPos.y + Math.cos(time * 2 + n.offset) * 0.3;
         const targetZ = n.originalPos.z + Math.sin(time + n.offset) * 0.3;
-        
+
         // Mouse repulsion logic
         const distToMouse = n.mesh.position.distanceTo(mousePoint);
         if (distToMouse < 4) {
@@ -180,10 +197,10 @@ export function LandingHeroGraph() {
       });
 
       // Update lines to follow nodes
-      lines.forEach(l => {
+      lines.forEach((l) => {
         const p1 = nodes[l.i].mesh.position;
         const p2 = nodes[l.j].mesh.position;
-        
+
         const dist = p1.distanceTo(p2);
         if (dist < connectionThreshold) {
           const positions = l.line.geometry.attributes.position.array as Float32Array;
@@ -195,7 +212,7 @@ export function LandingHeroGraph() {
           positions[5] = p2.z;
           l.line.geometry.attributes.position.needsUpdate = true;
           // Dynamically adjust opacity based on distance
-          (l.line.material as THREE.LineBasicMaterial).opacity = 1 - (dist / connectionThreshold);
+          (l.line.material as THREE.LineBasicMaterial).opacity = 1 - dist / connectionThreshold;
         } else {
           (l.line.material as THREE.LineBasicMaterial).opacity = 0;
         }
@@ -205,26 +222,56 @@ export function LandingHeroGraph() {
     }
 
     const handleResize = () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
     };
 
+    const resume = () => {
+      if (document.hidden || !visible) {
+        cancelAnimationFrame(animationId);
+        animationId = 0;
+      } else if (!animationId) animate();
+    };
+    const observer = new IntersectionObserver((entries) => {
+      visible = entries[0].isIntersecting;
+      resume();
+    });
+    observer.observe(container);
+    document.addEventListener('visibilitychange', resume);
+    renderer.domElement.addEventListener('webglcontextrestored', resume);
     window.addEventListener('resize', handleResize);
     animate();
 
     return () => {
+      observer.disconnect();
+      document.removeEventListener('visibilitychange', resume);
+      renderer.domElement.removeEventListener('webglcontextrestored', resume);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', handleMouseMove);
       cancelAnimationFrame(animationId);
+      scene.traverse((object) => {
+        if (object instanceof THREE.Mesh || object instanceof THREE.Line) {
+          object.geometry.dispose();
+          const materials = Array.isArray(object.material) ? object.material : [object.material];
+          materials.forEach((material) => material.dispose());
+        }
+      });
       renderer.dispose();
+      renderer.forceContextLoss();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
     };
-  }, []);
+  }, [reduced]);
 
-  return <div ref={containerRef} className="absolute inset-0 w-full h-full opacity-60 z-0" />;
+  return (
+    <div
+      aria-hidden="true"
+      ref={containerRef}
+      className="absolute inset-0 w-full h-full opacity-60 z-0"
+    />
+  );
 }

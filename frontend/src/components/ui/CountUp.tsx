@@ -1,18 +1,28 @@
-import React, { useEffect, useState } from 'react';
-import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
-
-export function CountUp({ to, duration = 1.5, className }: { to: number, duration?: number, className?: string }) {
+import { useEffect } from 'react';
+import { motion, useMotionValue, useTransform, animate, useReducedMotion } from 'framer-motion';
+export function CountUp({
+  to,
+  duration = 1.5,
+  className,
+}: {
+  to: number;
+  duration?: number;
+  className?: string;
+}) {
   const count = useMotionValue(0);
-  const rounded = useTransform(count, (latest) => Math.round(latest));
-  const [hasAnimated, setHasAnimated] = useState(false);
-
+  const rounded = useTransform(count, (value) => Math.round(value));
+  const reduced = useReducedMotion();
   useEffect(() => {
-    if (!hasAnimated) {
-      const animation = animate(count, to, { duration, ease: [0.22, 1, 0.36, 1] });
-      setHasAnimated(true);
-      return animation.stop;
+    if (reduced || duration === 0) {
+      count.set(to);
+      return;
     }
-  }, [count, to, duration, hasAnimated]);
-
-  return <motion.span className={className}>{rounded}</motion.span>;
+    const animation = animate(count, to, { duration, ease: [0.22, 1, 0.36, 1] });
+    return () => animation.stop();
+  }, [count, to, duration, reduced]);
+  return reduced || duration === 0 ? (
+    <span className={className}>{Math.round(to)}</span>
+  ) : (
+    <motion.span className={className}>{rounded}</motion.span>
+  );
 }

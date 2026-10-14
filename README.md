@@ -1,188 +1,80 @@
 # KnowFlow
-> Enterprise AI Knowledge Assistant and Intelligence Hub
 
-![Status](https://img.shields.io/badge/status-prototype-orange)
-![React](https://img.shields.io/badge/React-19.2.7-blue)
-![Vite](https://img.shields.io/badge/Vite-8.1.1-purple)
-![Tailwind](https://img.shields.io/badge/TailwindCSS-4.3.3-38B2AC)
+A personal knowledge and productivity hub for notes, documents, captured images, meeting content and source-grounded questions.
 
-## Table of Contents
-- [Overview / About](#overview--about)
-- [Features](#features)
-- [Demo / Screenshots](#demo--screenshots)
-- [Tech Stack](#tech-stack)
-- [Architecture](#architecture)
-- [Project Structure](#project-structure)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Environment Variables / Configuration](#environment-variables--configuration)
-- [Usage](#usage)
-- [API Documentation](#api-documentation)
-- [Database Schema](#database-schema)
-- [Scripts / Commands](#scripts--commands)
-- [Testing](#testing)
-- [Deployment](#deployment)
-- [Folder-by-Folder Deep Dive](#folder-by-folder-deep-dive)
-- [Troubleshooting / FAQ](#troubleshooting--faq)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [License](#license)
-- [Acknowledgments / Credits](#acknowledgments--credits)
-- [Contact / Support](#contact--support)
+## Authority and current status
 
-## Overview / About
-**KnowFlow** is an enterprise-grade AI Knowledge Assistant designed to help students and professionals organize scattered notes, documents, and whiteboard captures. This repository currently houses the **frontend UI prototype**, featuring a rich, highly interactive aesthetic with glassmorphism, WebGL shaders, and smooth micro-interactions. It aims to solve the problem of unstructured data by providing a unified platform to capture, store, and process personal knowledge artifacts using planned Machine Learning and RAG features.
+The repository's **Business Requirements Document** (`BRD  Intelligent Personal Productivity Hub Using ML, OpenCV, and RAG.pdf`) is the source of truth, supplemented by the owner's explicit decisions. All BRD features—including §14 extensions—are mandatory. This is a personal project, not an enterprise/compliance product.
 
-## Features
-- **Knowledge Capture Interface**: Dropzone for files, text intake, and an animated voice dictation UI.
-- **Interactive Dashboard**: High-level system overview with charts (Recharts) and mock analytics.
-- **Document Library**: Filterable list of stored knowledge nodes with 3D hover interactions.
-- **Proximity Timeline**: Chronological activity feed utilizing proximity-based framer-motion hover effects.
-- **AI Assistant UI**: Chat interface for querying the planned AI assistant.
-- **Fluid WebGL Backgrounds**: Animated raw WebGL shaders and React Three Fiber graphs running in the background for a premium feel.
-- **Global Sidebar Navigation**: Expandable/collapsible sidebar with fluid motion physics.
+**Phase 4 implements the API-connected frontend and backend contract.** The backend has not been implemented or deployed. There is no simulated production login, local mock persistence, fake OCR, timer-generated answer, or fabricated analytics. Without the service, the UI reports unavailability. Test fixtures exist only in test files.
 
-## Demo / Screenshots
-<!-- TODO: Add live demo link here -->
-<!-- TODO: Add a GIF demonstrating the Proximity Timeline hover effect -->
-<!-- TODO: Add screenshot of the Capture dictation interface -->
-<!-- TODO: Add screenshot of the Dashboard -->
+Selected-document sharing with view/edit permissions was explicitly chosen after reviewing BRD §14; there are **no shared workspaces**. Detailed roadmap work remains gated on Phase 5 approval.
 
-## Tech Stack
-### Frontend
-- **React** (v19.2.7) - UI component architecture
-- **Vite** (v8.1.1) - Lightning-fast build tool and dev server
-- **Tailwind CSS** (v4.3.3) - Utility-first styling with custom tokens
-- **React Router** (v7.18.1) - Client-side navigation
-- **Framer Motion** (v12.42.2) - Complex spring physics and proximity animations
-- **Three.js** (v0.185.1) & **React Three Fiber** (v9.6.1) - 3D visualizers and WebGL
-- **Recharts** (v3.9.2) - Dashboard analytics charts
-- **Lucide React** (v1.25.0) - SVG iconography
+## Feature coverage
 
-### Backend / Database (Planned)
-- Python (FastAPI recommended)
-- PostgreSQL (metadata)
-- FAISS/Chroma (Vector Database)
-- OpenCV / LangChain (Data Processing & RAG)
+| BRD authority | Implemented frontend | Later backend responsibility |
+|---|---|---|
+| §§5, 7.8, 8.3 | Login/register, cookie-session bootstrap, logout, protected routes, User/Admin navigation and Admin configuration/health | Identity verification, password hashing, sessions, CSRF, authorization, real service configuration |
+| §§7.1–7.3, 10.1 | Batch file/drop intake, camera preview/retake, text/clipboard, metadata, validation, processing status/retry/cancel, original/preprocessed source and extracted-text review | Signature validation, quotas, storage, OpenCV, OCR, jobs and indexed source association |
+| §§7.3–7.5, 10.4 | Type/topic/text correction, source-linked task create/edit/delete/complete, priorities/due dates and filters | Classification/topic models, action detection, canonical persistence/reindexing and deduplication |
+| §§6.2, 10.2 | Meeting creation, labeled/dated intake, artifact/task links, summary and decisions, summary job action | Grouping, grounded summarization/decisions and extraction |
+| §§6.5, 7.7 | Paginated library and timeline; search/topic/type/date filters, shared/owned views, local-time grouping | Authorized indexed search, aggregation and pagination |
+| §§7.6, 10.3 | Grounded assistant requests, saved conversation pagination, selected-document context, evidence/insufficient-evidence states and source/page links | Retrieval, embeddings/index compatibility, generation, saved messages and access revalidation |
+| §§7.7, 8.4 | Profile, password and provider-neutral model/capture settings; first-capture/question guide | Persist settings; enforce identity/security policy and adapter availability |
+| §§4.2, 14 | Audio recording/upload and transcript review; image query context/region citations; document invitations/grants/revocation; personal analytics | Transcription, multimodal retrieval, recipient identity/ACLs, metric aggregation/provenance |
 
-## Architecture
-Currently, the system is a **Frontend-only Single Page Application (SPA)**. 
-- **Routing Structure**: Built around a top-level `BrowserRouter`. Marketing pages (`/`, `/login`, `/onboarding`) are unauthenticated. The core application is nested inside a protected `<SidebarLayout>` wrapper that manages the persistent navigation menu and the global WebGL background shader.
-- **Data Flow**: Presently uses hardcoded mock arrays defined at the top of page components. A future integration phase will replace this with a data-fetching layer (e.g., TanStack Query) hooked into the Python FastAPI backend.
+Study time is displayed only when supplied with a measurement definition. **“Not measured” is not zero.** Topic coverage means tagged-document counts, not learning mastery.
 
-## Project Structure
-```text
-.
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── 3d/        # WebGL shaders & React Three Fiber visualizers
-│   │   │   ├── layout/    # Shared wrappers like SidebarLayout
-│   │   │   └── ui/        # Reusable atoms (GlassCard, Button, Aurora)
-│   │   ├── pages/         # Route-level views (Dashboard, Capture, Library)
-│   │   ├── App.tsx        # Root routing configuration
-│   │   └── main.tsx       # Application entry point
-│   ├── package.json       # Dependencies & npm scripts
-│   ├── tailwind.config.ts # Design tokens (colors, fonts, sizing)
-│   └── vite.config.ts     # Vite bundler config
-├── BRD...pdf              # Business Requirements Document (Project spec)
-├── PROJECT_FRONTEND_CONTEXT.md # Frontend architecture rules
-└── PROJECT_MEMORY.md      # Core status and context memory
+## Stack
+
+React + TypeScript, React Router, Vite, Tailwind CSS, Framer Motion, Lucide, raw Three.js, Recharts, clsx/tailwind-merge. No new production libraries were added. Unused React Three Fiber/Drei and confirmed-disconnected visuals/template assets were removed.
+
+State and networking use React hooks/context and browser `fetch`, `AbortController`, `FormData`, `MediaRecorder` and `getUserMedia`. Zustand, TanStack Query, Zod and React Hook Form are not installed or required. No AI provider has been selected. The BRD's backend/storage examples are alternatives, not binding implementation decisions.
+
+Exact resolved package versions are in `frontend/package-lock.json`. Approved development-only tools and their purposes are recorded in [PROJECT_MEMORY.md](PROJECT_MEMORY.md).
+
+## Run locally
+
+Use Node **22.22.3** (`.nvmrc`; compatible engine range is also in `package.json`).
+
+```sh
+nvm use
+cd frontend
+npm ci
+cp .env.example .env.local
+npm run dev -- --host 0.0.0.0
 ```
 
-## Prerequisites
-To run this project locally, ensure you have the following installed:
-- **Node.js** (v18.0.0 or higher recommended)
-- **npm** (v9.0.0+)
+The UI listens on port 5173. Browser requests use `/api/v1`. Once a backend exists, set `API_PROXY_TARGET` to its origin in `.env.local`; Vite proxies `/api/*` server-side. Do not put a browser-facing `localhost` backend URL into a hosted preview.
 
-## Installation
-### Local Development
-```bash
-# 1. Clone the repository
-git clone https://github.com/mritunjai-prog/KnowFlow.git
+Until that service exists, public pages can be reviewed, but authenticated workflows require a working API. The test suite supplies isolated HTTP fixtures; running the application does not enable them.
 
-# 2. Navigate to the frontend directory
-cd KnowFlow/frontend
+## Validate
 
-# 3. Install dependencies
-npm install
+From `frontend/`:
 
-# 4. Start the development server
-npm run dev
+```sh
+npm run lint
+npm run test:types
+npm test
+npm run contract:check
+npm run build
+npm audit
+npx playwright install --with-deps chromium
+npm run test:e2e
 ```
-The application will be accessible at `http://localhost:5173`.
 
-## Environment Variables / Configuration
-There are currently **no environment variables, secrets, or `.env` files** required to run the frontend UI prototype. All data is mocked and no external APIs are hit natively yet. 
-*(Note: A `.mimocode/settings.json` exists for local IDE configuration to connect to the Google Stitch MCP server for design assets).*
+`npm run contract:generate` regenerates `docs/openapi.json` after deliberate changes to DTOs/operations. `npm run test:watch` runs unit tests interactively. Playwright's server is test-owned and stops when tests finish unless an existing local server was reused.
 
-## Usage
-Start the app in dev mode using `npm run dev` from the `frontend` folder.
-- **Marketing**: Navigate to `http://localhost:5173/` to see the 3D Knowledge Web.
-- **Auth**: Go to `/login` and `/onboarding` to view the entry flows.
-- **App Core**: Navigate to `/dashboard` to enter the main authenticated wrapper with the sidebar, and explore `/capture`, `/library`, `/timeline`, and `/tasks`.
+[Frontend validation CI](.github/workflows/frontend.yml) runs the same categories on pushes/PRs. The workflow is added, but a remote GitHub run has not been observed in this session.
 
-## API Documentation
-*Not applicable.* The project is currently a frontend UI prototype. Backend APIs (FastAPI) are planned on the roadmap.
+Latest local verification: **27 unit tests and 19 Chromium browser tests passed**, strict lint/type/build/contract checks passed, npm audit returned zero advisories. Automated WCAG A/AA checks found no violations in tested states; this is not a full accessibility certification. The lazy Three.js chunk remains approximately 526 kB minified and triggers a non-blocking build warning.
 
-## Database Schema
-*Not applicable.* Currently relying on mock data constants inside React components. PostgreSQL and Vector DBs will be introduced alongside the backend integration.
+## Contract and deployment
 
-## Scripts / Commands
-All commands are run from the `frontend/` directory.
+- [OpenAPI 3.1](docs/openapi.json): schemas, operations, errors, authentication, permissions, jobs, pagination and multipart inputs.
+- [Backend/deployment handoff](docs/BACKEND_HANDOFF.md): executable Netlify config, Render integration, cookie/CSRF and environment requirements.
+- [Phase 4 repair and verification report](docs/PHASE_4_REPORT.md): F01–F41 disposition, test evidence, limitations and all README/BRD conflicts.
+- [Frontend architecture](PROJECT_FRONTEND_CONTEXT.md): routes, state and component responsibilities.
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Starts the Vite development server with Hot Module Replacement (HMR). |
-| `npm run build` | Compiles TypeScript and builds the production bundle via Vite. |
-| `npm run lint` | Runs `oxlint` to check for code quality and syntax issues. |
-| `npm run preview` | Boots a local web server to preview the compiled production `dist/` folder. |
-
-## Testing
-*Not applicable.* There are currently no testing frameworks (like Jest, Vitest, or Cypress) configured in this repository.
-
-## Deployment
-<!-- TODO: Add specific deployment platform details once decided (e.g., Vercel, Netlify) -->
-The frontend can be easily deployed to static hosting platforms like Vercel or Netlify:
-1. Set the build command to `npm run build`
-2. Set the publish directory to `frontend/dist`
-3. Ensure client-side routing is configured (rewrite all traffic to `/index.html`).
-
-## Folder-by-Folder Deep Dive
-- **`frontend/src/components/3d/`**: Contains advanced React Three Fiber implementations (e.g., `KnowledgeWeb.tsx`, `LandingHeroGraph.tsx`) and raw WebGL shaders (`ShaderBackground.tsx`) for the premium interactive backgrounds.
-- **`frontend/src/components/ui/`**: Core reusable aesthetic blocks like `GlassCard.tsx` (blur effects) and `LineSidebar.tsx` (proximity hover navigation).
-- **`frontend/src/pages/`**: Each file maps 1-to-1 with a route defined in `App.tsx`.
-
-## Troubleshooting / FAQ
-**Q: The 3D background is consuming too much CPU.**
-A: The `ShaderBackground.tsx` runs a continuous `requestAnimationFrame` loop. Ensure you are not running it on multiple overlapping components.
-
-**Q: I get errors about missing Tailwind classes.**
-A: This project uses Tailwind CSS v4. Ensure your IDE is using the latest Tailwind IntelliSense extension, as configuration patterns (like `@tailwindcss/postcss`) have changed from v3.
-
-## Roadmap
-- [ ] Implement global state management using Zustand.
-- [ ] Implement data fetching layer using TanStack React Query.
-- [ ] Connect frontend to Python FastAPI endpoints.
-- [ ] Replace mock JSON objects with real DB data.
-- [ ] Implement robust Form validation (e.g., Zod + React Hook Form).
-
-## Contributing
-<!-- TODO: Define strict contribution rules or link to a CONTRIBUTING.md -->
-Contributions are welcome. Please ensure that you:
-1. Maintain the high visual standard (use Framer Motion for DOM physics, raw RAF for WebGL only).
-2. Adhere to Tailwind for styling; avoid custom CSS in `index.css`.
-3. Wrap new page components in staggered `<motion.div>` variants.
-
-## License
-<!-- TODO: Add license information. No LICENSE file was found in the repository. -->
-This repository currently does not have a license file. Please contact the maintainers regarding usage rights.
-
-## Acknowledgments / Credits
-- Design system inspired by modern glassmorphic enterprise SaaS dashboards.
-- Utilizes [Google Stitch MCP](https://stitch.googleapis.com) for design asset integration.
-
-## Contact / Support
-<!-- TODO: Add maintainer contact email or Twitter handle -->
-- **Maintainer**: [Your Name/Handle Here]
-- **Issue Tracker**: Please use the GitHub Issues tab for bugs and feature requests.
+Netlify builds `frontend/` with `npm run build` and publishes `dist/`. Its committed `/api/*` rule intentionally returns **503 JSON** until the actual Render reverse-proxy destination is configured; API failures must not fall through to the SPA's HTML. No deployment or backend integration is claimed.

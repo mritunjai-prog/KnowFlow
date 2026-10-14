@@ -1,8 +1,11 @@
 @import "tailwindcss";
 @config "../tailwind.config.ts";
-
 @layer base {
-  body {
-    @apply bg-sand text-deep-slate font-body;
-  }
+  body { @apply bg-sand text-deep-slate font-body; }
+  button, input, select, textarea, a, summary { @apply focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary; }
+  button:not(:disabled), summary { cursor: pointer; }
+  :target { scroll-margin-top: 5rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }

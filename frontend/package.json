@@ -6,12 +6,16 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "oxlint",
-    "preview": "vite preview"
+    "lint": "oxlint --deny-warnings",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "contract:generate": "node scripts/generate-contract.mjs",
+    "contract:check": "node scripts/generate-contract.mjs --check",
+    "test:types": "tsc -p tsconfig.test.json --noEmit"
   },
   "dependencies": {
-    "@react-three/drei": "^10.7.7",
-    "@react-three/fiber": "^9.6.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.42.2",
     "lucide-react": "^1.25.0",
@@ -23,17 +27,27 @@
     "three": "^0.185.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4.3.3",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.185.1",
     "@vitejs/plugin-react": "^6.0.3",
     "autoprefixer": "^10.5.4",
+    "happy-dom": "^21.0.1",
     "oxlint": "^1.71.0",
     "postcss": "^8.5.20",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
-    "vite": "^8.1.1"
+    "vite": "^8.1.1",
+    "vitest": "^5.0.4"
+  },
+  "engines": {
+    "node": "^22.12.0 || >=24.0.0"
   }
 }
