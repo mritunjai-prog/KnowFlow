@@ -16,7 +16,7 @@ _Read this first. Updated for Phase 4 on 2026-10-15._
 
 API-driven React/TypeScript SPA. Runtime dependencies remain React/React DOM, React Router, Tailwind, Framer Motion, Lucide, Three.js, Recharts, clsx and tailwind-merge. Native fetch/AbortController/FormData/media APIs and React hooks/context handle networking/state. No application runtime test fixtures or backend-free success simulation.
 
-All domain routes are lazy loaded. Session/CSRF and role guards are in `frontend/src/auth/`; shared DTOs/client/resource/action hooks in `src/api/`. Domain screens and shared form/feedback/media/sharing components use that boundary. Raw Three.js hero is a separate optional-motion lazy import; shader/Three resources have cleanup, reduced-motion/static failure paths and visibility suspension. Inert enterprise claims/controls and externally hosted decorative font/image dependencies were removed.
+All domain routes are lazy loaded. Session/CSRF and role guards are in `frontend/src/auth/`; shared DTOs/client/resource/action hooks in `src/api/`. Domain screens and shared form/feedback/media/sharing components use that boundary. Raw Three.js landing hero and restored Login network are separate optional-motion lazy imports; shader/Three resources have cleanup, reduced-motion/static failure paths and visibility suspension. Inert enterprise claims/controls and externally hosted decorative font/image dependencies were removed.
 
 The backend is **not implemented**. Live authenticated persistence, OCR/transcription/classification/RAG, real metrics and authorization require the later service. The frontend honestly reports unavailability until connected. The formal provider-neutral handoff is `docs/openapi.json` plus `docs/BACKEND_HANDOFF.md`; do not replace it with a production mock store.
 
@@ -58,11 +58,11 @@ One-off code formatting used `prettier@3.6.2` through npm exec/npx; it was not a
 
 - Node pinned to **22.22.3**; engine range `^22.12.0 || >=24.0.0` accommodates installed test tooling. Old “Node 18+” guidance is obsolete.
 - Verified production build, test TypeScript, strict lint (zero warnings/errors), deterministic contract check and npm audit (zero advisories at check time).
-- **27 unit tests passed; 19 Chromium browser tests passed.** Automated WCAG 2 A/AA and 2.1 AA rules reported no violations on 12 authenticated route states plus Landing/Login. This does not certify every state, screen reader or browser.
+- **30 unit tests passed (eight files); 25 Chromium browser tests passed.** Automated WCAG 2 A/AA and 2.1 AA rules reported no violations on 12 authenticated route states plus Landing/Login. This does not certify every state, screen reader or browser.
 - Browser coverage includes 320/390px phones, a short 768px tablet and 1280/1440px desktop layouts; API failure, role denial, persistence, selected sharing, source links, retry/idempotency and WebGL-off behavior. Media tests use simulated streams/recorders plus real-browser permission-denial handling; physical hardware is not certified.
 - Build still emits a non-blocking **lazy Three.js ~526 kB** warning. Route/chart/hero splitting is implemented; no warning threshold was raised to conceal it. No blanket 60fps/latency/SLA claim is made.
 - Actual Render/Netlify integration, model correctness, identity/email verification, server ACLs, quotas and metric provenance remain backend/deployment acceptance responsibilities—not completed frontend execution.
-- The Netlify API rule deliberately serves JSON 503 before the SPA fallback until the real Render proxy is substituted. No live deployment, commit, push or remote CI success was claimed.
+- The Netlify API rule deliberately serves JSON 503 before the SPA fallback until the real Render proxy is substituted. No live deployment or remote CI success is claimed. Publication was subsequently authorized (see below).
 - Phase 5 remains unstarted, pending explicit approval.
 
 ## Historical correction
@@ -78,3 +78,16 @@ The next user screenshot confirmed an E2B 502 **SANDBOX NOT FOUND** response at 
 ## Git publication authorized
 
 The user subsequently asked to push the completed frontend so they can fetch it into their existing local KnowFlow checkout and run it there. This explicitly authorizes committing and publishing the Phase 4 work to `arena/d9bd44f3-knowflow` only. It does not authorize merging into main, deployment, or Phase 5. Use Git history and the remote branch for publication status; the earlier no-commit/no-push statements describe the original Phase 4 handoff.
+
+
+## Login visual restoration — approved Phase 4 correction
+
+The user objected to removal of the original Login presentation and explicitly approved restoring it **while retaining API-backed auth, validation, accessibility, reduced motion and graphics fallback**, with publication to the same `arena/d9bd44f3-knowflow` branch. Functional fixes did not authorize stripping the existing design. Preserve approved visuals; repair their lifecycle and accessibility rather than making active components “unused” by removing their callers.
+
+- Restored the original design in `frontend/src/pages/Login.tsx`: warm glass two-column composition, staggered left-hand cards, animated card entrance, network watermark, Three.js network, wave/particle shader, pixel shimmer and spring-driven 3D sign-in/register flip.
+- Restored/hardened `src/components/3d/{NetworkGraph,ShaderBackground}.tsx` and `src/components/ui/PixelCard.tsx`. Pixel shimmer supports pointer hover and keyboard focus. Canvas work is bounded/throttled, pauses in hidden tabs and disposes RAFs/observers/listeners/GPU resources; graphics failure leaves the functional form and a static background. Shader context restoration is browser-tested.
+- `src/hooks/usePrefersReducedMotion.ts` subscribes to live OS preference changes (the installed Framer hook samples only at mount). Reduced preference stops/deallocates Login decorations and disables JS flip/entrance/button transforms without requiring a reload.
+- Only one form is mounted; exiting content is inert/hidden to assistive technology. Mode changes clear the password and move focus to the new heading. Real request/validation/loading/error/session/CSRF behavior is retained. Fixed competing imperative/declarative redirects uncovered by the new registration test: a single authenticated redirect now takes registration to Onboarding and sign-in to its safe requested destination.
+- Did **not** restore fake delayed login, sample credentials, inert social/forgot-password controls or invented recent activity. The glass side cards now describe capabilities honestly. No dependency or API-contract changes.
+- Added six browser cases in `frontend/tests/login-visuals.spec.ts` and three unit cases for the live preference subscription and PixelCard StrictMode/hidden-tab/cleanup/null-canvas behavior. Full latest checks: build, strict lint, test types, **30 unit / 25 browser tests**, contract synchronization and zero-vulnerability audit all passed locally. Normal-motion and reduced-motion Login axe checks passed; desktop screenshot reviewed. The lazy Three chunk warning remains (~526 kB); cross-browser/hardware/backend integration are not certified.
+- Updated `docs/PHASE_4_REPORT.md` with the correction and current evidence. The earlier downloadable preview ZIP predates this restoration; use the branch source/build instead. No backend, deployment, main-branch merge or Phase 5 work was done.

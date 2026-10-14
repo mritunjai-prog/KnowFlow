@@ -51,8 +51,8 @@ Evidence abbreviations: **U** = unit tests in `api/*.test.*`, `auth/AuthContext.
 | F31 | No deployment boundary; executable Netlify base/build/publish/SPA/API-fallback, Node pin, Vite proxy and env sample. | `netlify.toml`, `.nvmrc`, `.env.example`, handoff | V build/config review. Actual Netlify/Render cookie/proxy deployment not run. |
 | F32 | Eight dependency audit entries; targeted compatible lock updates and removal of unused R3F graph dependencies. | package manifests/lock | npm audit: zero advisories; V and regression suite. Point-in-time result only. |
 | F33 | Unsupported enterprise/security/performance copy and dead actions; personal-product wording, required routed actions; removed unimplemented sales/SSO/compliance claims. | Landing, Login, Dashboard, Settings | B navigation/auth; documentation/content review. No invented SLA/compliance evidence. |
-| F34 | No regressions/release gate; approved dev-only unit/browser/axe tooling, typed isolated fixtures and CI definition. | Test/config/workflow files | 27 U + 19 B/A pass locally. Remote CI has not yet been observed. |
-| F35 | Unrouted/unused components and type escapes; removed only confirmed obsolete library/3D/UI chains/template assets, reused shared feedback and separated hook exports. | Removed files in diff; canonical Library/shared UI/auth/hooks | V zero lint warnings/errors; production type build. No backend or unrelated root-export cleanup. |
+| F34 | No regressions/release gate; approved dev-only unit/browser/axe tooling, typed isolated fixtures and CI definition. | Test/config/workflow files | 30 U + 25 B/A pass locally after the Login correction below. Remote CI has not yet been observed. |
+| F35 | Unrouted/unused components and type escapes; library/UI/template cleanup, shared feedback and separated hook exports. The original Login graphics were incorrectly removed in this pass and are restored in the correction below. | Removed files in diff; canonical Library/shared UI/auth/hooks | V zero lint warnings/errors; production type build. No backend or unrelated root-export cleanup. |
 | F36 | Remote icon/font/image dependency; bundled Lucide controls, intentional system font fallback, real source/null thumbnail handling. | index.html, pages, shared UI | B/A run without external decorative assets. No third-party image license claim. |
 | F37 | Stale scope/architecture docs; updated README, memory, architecture and agent instructions with explicit history and true boundaries. | Root docs; this report and handoff | D01–D19 reconciliation below. |
 | F38 | Voice animation only; actual recorder/format checks, consent guidance, timers/stop/cleanup, upload preview and transcript-source review. | MediaCapture, Capture, Processing, DocumentDetail | U four media cases; A permission denial. Physical microphone/transcription service not tested. |
@@ -69,15 +69,15 @@ Executed from `frontend/` with Node 22.22.3:
 | `npm run build` | TypeScript + Vite production build passed |
 | `npm run lint` | 0 warnings, 0 errors (`--deny-warnings`) |
 | `npm run test:types` | App, test helpers/specs and test config types passed |
-| `npm test` | 27 tests passed in six files |
+| `npm test` | 30 tests passed in eight files |
 | `npm run contract:check` | DTO/operation generation matched committed OpenAPI |
 | `npm audit` | 0 vulnerabilities reported |
-| `npm run test:e2e` | 19 Chromium tests passed, approximately 2.3 minutes |
+| `npm run test:e2e` | 25 Chromium tests passed, approximately 3.2 minutes |
 | Axe in browser tests | No detected WCAG 2 A/AA and 2.1 AA violations in 12 authenticated route states plus Landing/Login |
 
 In the restricted sandbox, browser invocation used `CHROMIUM_EXECUTABLE_PATH=/tmp/chromium` and `LD_LIBRARY_PATH=/tmp/knowflow-browser-libs/lib`. These temporary environment-specific paths are not a production dependency. The committed instructions use Playwright's normal Chromium install; CI must execute independently.
 
-Latest measured build: entry approximately **401.80 kB** minified / **129.60 kB** gzip; Dashboard/chart route **359.16 / 105.12 kB**; optional Three.js **525.79 / 131.58 kB**; separate landing and hero chunks approximately 4 kB each. Vite still reports the >500 kB Three.js warning. Earlier entry/shared chunk grouping differed, so comparing a single old entry filename alone would be misleading. No real-user latency/60fps guarantee is inferred.
+Latest measured build: entry approximately **402.22 kB** minified / **129.79 kB** gzip; Dashboard/chart route **359.16 / 105.10 kB**; optional Three.js **526.35 / 131.69 kB**; separate landing and hero chunks approximately 4 kB each. Vite still reports the >500 kB Three.js warning. Earlier entry/shared chunk grouping differed, so comparing a single old entry filename alone would be misleading. No real-user latency/60fps guarantee is inferred.
 
 ### Limits—not silent feature cuts
 
@@ -116,3 +116,29 @@ Supporting memory/context/AGENTS drift was also corrected: no unverified 60fps a
 ## Stop point
 
 Phase 4 frontend changes and the backend handoff are ready for review. **At the original Phase 4 handoff, no commit/push/deployment had been performed and no Phase 5 roadmap had been started.** The owner subsequently authorized committing/pushing this work to `arena/d9bd44f3-knowflow` for local review. This does not authorize merging main, deployment or Phase 5; see Git history for publication status.
+
+
+## Login visual correction (2026-10-15)
+
+**User-approved correction to Phase 4, not Phase 5.** The initial auth rewrite removed the original Login design and then treated its former graphics as dead code. That was a visual regression, not a necessary functional fix. The user requested restoration while keeping the new auth, validation, accessibility, reduced-motion behavior and WebGL fallback, and approved pushing the correction to the same branch.
+
+### Restored presentation and safeguards
+
+| Area | Implementation/evidence |
+|---|---|
+| Original visual language | `src/pages/Login.tsx`: warm glass layout, staggered side cards, network watermark, entrance animation and spring 3D form flip. Side-card descriptions replace fabricated activity; fake credentials/delayed auth/inert controls are not restored. |
+| Three.js network | `src/components/3d/NetworkGraph.tsx`: lazy import, original drifting connected-node effect, capped DPR/30fps render work, independent line materials, resize/context-loss handling and explicit disposal. Constructor failure does not remove the form. |
+| Shader | `src/components/3d/ShaderBackground.tsx`: original waves/particles, static CSS fallback, validated compile/link, cleaned-up resources/listeners/RAF, hidden-tab pause and context-restoration reinitialization. |
+| Pixel hover | `src/components/ui/PixelCard.tsx`: original shimmer for both pointer hover and keyboard focus; responsive content sizing, bounded pixel count, visibility pause and complete cleanup. |
+| Reduced motion | `src/hooks/usePrefersReducedMotion.ts`: live preference subscription; toggling the OS preference stops the restored decorative canvases and JS entrance/flip/button transforms without reloading. |
+| Accessible form flip | `AnimatePresence` wait mode mounts only one form. Exiting content is inert/aria-hidden; password is cleared on switching and focus goes to the new heading. Controls, labels, hints, validation and loading/error/retry states remain API-backed. |
+| Redirect correction | Registration testing exposed competing imperative and declarative navigation. One authenticated redirect now routes registration to Onboarding and login to the validated requested destination; session/CSRF handling stays unchanged. |
+
+### Verification after restoration
+
+- Complete suite: **30 unit tests in eight files; all 25 Chromium browser tests passed**. No earlier workflow was dropped. Production build, strict lint, test TypeScript, contract synchronization and `npm audit` (zero vulnerabilities) passed.
+- Six new browser cases cover actual canvas/pixel activity on hover and keyboard focus, graphics remounting, single-form flip/focus/password clearing, server-confirmed registration/CSRF/onboarding, live reduced-motion changes, missing canvas/WebGL with visible auth failure, responsive login/registration and shader context loss/restoration. API responses are isolated browser-test fixtures, not a production mock backend.
+- Three new unit cases cover preference subscription/StrictMode cleanup, PixelCard observer/event/RAF cleanup and hidden-tab pausing, and null-canvas fallback with usable child inputs.
+- Axe checks reported no violations for tested normal-motion and reduced-motion Login states. Reviewed the captured 1280×900 desktop screenshot; narrow form layouts were browser-tested at 320px, 390px and 768px. This does not certify every screen reader, GPU or browser.
+- Login route chunk: **19.71 kB minified / 7.73 kB gzip**. Lazy Three.js remains **526.35 / 131.69 kB** with Vite's non-blocking size warning; no warning threshold was raised. No new runtime or development dependency was added for this correction.
+- Publication is authorized only to `arena/d9bd44f3-knowflow`. No merge to main, live deployment, backend implementation or Phase 5 work. The earlier preview ZIP is stale relative to this correction.
