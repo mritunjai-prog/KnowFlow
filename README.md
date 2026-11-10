@@ -8,7 +8,7 @@ The repository's **Business Requirements Document** (`BRD  Intelligent Personal 
 
 **Phase 4 implements the API-connected frontend and backend contract.** The backend has not been implemented or deployed. There is no simulated production login, local mock persistence, fake OCR, timer-generated answer, or fabricated analytics. Without the service, the UI reports unavailability. Test fixtures exist only in test files.
 
-Selected-document sharing with view/edit permissions was explicitly chosen after reviewing BRD §14; there are **no shared workspaces**. Detailed roadmap work remains gated on Phase 5 approval.
+Selected-document sharing with view/edit permissions was explicitly chosen after reviewing BRD §14; there are **no shared workspaces**. The [Phase 5 roadmap](docs/PHASE_5_ROADMAP.md) is delivered for review; backend implementation and deployment still require separate approval.
 
 ## Feature coverage
 
@@ -27,7 +27,7 @@ Study time is displayed only when supplied with a measurement definition. **“N
 
 ## Stack
 
-React + TypeScript, React Router, Vite, Tailwind CSS, Framer Motion, Lucide, raw Three.js, Recharts, clsx/tailwind-merge. No new production libraries were added. Unused React Three Fiber/Drei and confirmed-disconnected visuals/template assets were removed.
+React + TypeScript, React Router, Vite, Tailwind CSS, Framer Motion, Lucide, raw Three.js, Recharts, clsx/tailwind-merge. No new production libraries were added. Unused React Three Fiber/Drei and obsolete template assets were removed. Original Login network/shader/pixel/flip effects were restored after the initial visual regression, with accessibility and graphics fallbacks retained.
 
 State and networking use React hooks/context and browser `fetch`, `AbortController`, `FormData`, `MediaRecorder` and `getUserMedia`. Zustand, TanStack Query, Zod and React Hook Form are not installed or required. No AI provider has been selected. The BRD's backend/storage examples are alternatives, not binding implementation decisions.
 
@@ -68,7 +68,7 @@ npm run test:e2e
 
 [Frontend validation CI](.github/workflows/frontend.yml) runs the same categories on pushes/PRs. The workflow is added, but a remote GitHub run has not been observed in this session.
 
-Latest local verification: **27 unit tests and 19 Chromium browser tests passed**, strict lint/type/build/contract checks passed, npm audit returned zero advisories. Automated WCAG A/AA checks found no violations in tested states; this is not a full accessibility certification. The lazy Three.js chunk remains approximately 526 kB minified and triggers a non-blocking build warning.
+Latest local verification: **30 unit tests and 25 Chromium browser tests passed**, strict lint/type/build/contract checks passed, npm audit returned zero advisories. Automated WCAG A/AA checks found no violations in tested states; this is not a full accessibility certification. The lazy Three.js chunk remains approximately 526 kB minified and triggers a non-blocking build warning.
 
 ## Contract and deployment
 
@@ -76,5 +76,6 @@ Latest local verification: **27 unit tests and 19 Chromium browser tests passed*
 - [Backend/deployment handoff](docs/BACKEND_HANDOFF.md): executable Netlify config, Render integration, cookie/CSRF and environment requirements.
 - [Phase 4 repair and verification report](docs/PHASE_4_REPORT.md): F01–F41 disposition, test evidence, limitations and all README/BRD conflicts.
 - [Frontend architecture](PROJECT_FRONTEND_CONTEXT.md): routes, state and component responsibilities.
+- [Phase 5 roadmap](docs/PHASE_5_ROADMAP.md): remaining implementation milestones, dependencies, decision gates, risks and full-product acceptance; planning only.
 
 Netlify builds `frontend/` with `npm run build` and publishes `dist/`. Its committed `/api/*` rule intentionally returns **503 JSON** until the actual Render reverse-proxy destination is configured; API failures must not fall through to the SPA's HTML. No deployment or backend integration is claimed.

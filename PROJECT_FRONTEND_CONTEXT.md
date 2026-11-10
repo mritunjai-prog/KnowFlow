@@ -49,7 +49,7 @@ Document text, messages and snippets render as React text, not injected HTML. So
 
 Tailwind tokens remain based on slate/sand/umber/sage with a darker accessible action-red semantic value. Prefer existing utilities and shared controls. `index.css` has necessary global focus/reduced-motion rules; it is not forbidden to fix accessibility at the global layer. Typography uses an intentional system fallback, with no required remote font request. Controls use bundled Lucide icons.
 
-Raw Three.js is only the retained landing graph; React Three Fiber/Drei were unused after cleanup and removed. The graph caps DPR, disposes meshes/materials/renderer, stops hidden/offscreen work and tolerates missing WebGL. ShaderBackground checks compile/link success, sizes on resize, disposes resources and uses a static sand fallback. CountUp uses motion values correctly and immediately shows the final value when motion/duration is disabled.
+Raw Three.js powers the lazy landing graph and restored Login network; React Three Fiber/Drei were removed. The graphs cap DPR, dispose meshes/materials/renderer and suspend hidden-tab work; the landing graph also pauses offscreen. Graphics creation failure leaves the functional UI available. ShaderBackground checks compile/link success, sizes on resize, disposes resources and uses a static sand fallback. Login restores the original glass cards, spring form flip and PixelCard shimmer for hover/keyboard focus. Its live reduced-motion hook stops decorations when the preference changes; only one form is mounted and switching clears passwords/transfers focus. CountUp uses motion values correctly and immediately shows the final value when motion/duration is disabled.
 
 Lazy routes isolate Recharts and Three.js. The remaining ~526 kB Three.js chunk warning is documented, not suppressed. Frame rate, heap growth over days and real-device GPU behavior are not certified by the browser regression suite.
 
@@ -58,3 +58,7 @@ Lazy routes isolate Recharts and Three.js. The remaining ~526 kB Three.js chunk 
 See README for commands and `docs/PHASE_4_REPORT.md` for exact evidence. Browser fixtures live in `frontend/tests/fixtures.ts`, never in application imports. Test types are checked separately. Native-media success is simulated in unit tests; real permission-denial/fallback behavior is checked in Chromium.
 
 `netlify.toml` is executable build/SPA/API-fallback configuration; `.env.example` distinguishes browser-public API base from Vite's server-side proxy target. Real Render proxy/cookies/CSRF/private caching/provider setup is explained in `docs/BACKEND_HANDOFF.md`. No provider, backend framework, database or live credentials have been selected by this frontend work.
+
+## Phase 5 planning handoff
+
+`docs/PHASE_5_ROADMAP.md` records the remaining backend/integration milestones and acceptance gates. Pending verification, real study-time collection, revocable file access and synchronous query timing require explicit integration decisions. The roadmap does not select providers or authorize implementation/deployment; current runtime architecture is unchanged.
