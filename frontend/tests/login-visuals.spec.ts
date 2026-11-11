@@ -83,10 +83,19 @@ test('flip retains one form, transfers focus, clears passwords and preserves ser
   expect(state.requests.filter((request) => request.path === '/auth/register')).toHaveLength(0);
   await page.getByLabel('Password', { exact: true }).fill('correct horse battery');
   await page.getByRole('button', { name: 'Create account', exact: true }).click();
-  await expect(page).toHaveURL(/\/onboarding$/);
+  await expect(page.getByRole('heading', { name: 'Confirm your email' })).toBeVisible();
+  await expect(page.getByText('The account is not signed in yet.')).toBeVisible();
+  await page.getByLabel('Verification token').fill('registration-token-value-20');
+  await page.getByLabel('Password', { exact: true }).fill('correct horse battery');
+  await page.getByRole('button', { name: 'Confirm email' }).click();
+  await expect(page.getByText('Email confirmed. No user is signed in.')).toBeVisible();
+  await expect(page).toHaveURL(/\/login$/);
   expect(state.requests.find((request) => request.path === '/auth/register')?.csrf).toBe(
     'test-csrf',
   );
+  expect(
+    state.requests.find((request) => request.path === '/auth/email-verifications/confirm')?.csrf,
+  ).toBe('test-csrf');
 });
 
 test('reduced motion is static and responds immediately to preference changes', async ({

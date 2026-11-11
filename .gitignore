@@ -7,3 +7,5 @@ coverage/
 playwright-report/
 test-results/
 *.tsbuildinfo
+frontend/src/**/*.js
+frontend/vite.config.js

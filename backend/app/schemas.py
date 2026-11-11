@@ -1,6 +1,8 @@
+import re
+from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_serializer
 
 
 class APIModel(BaseModel):
@@ -121,6 +123,12 @@ class SourceOut(APIModel):
     title: str
     page: int | None = None
     excerpt: str | None = None
+    region: list[float] | None = None
+
+    @model_serializer(mode="wrap")
+    def _omit_absent(self, handler):
+        data = handler(self)
+        return {key: value for key, value in data.items() if value is not None}
 
 
 class DocumentOut(APIModel):
@@ -137,6 +145,39 @@ class DocumentOut(APIModel):
     summary: str | None
     meetingId: str | None
     permission: Literal["owner", "edit", "view"]
+
+
+class ShareOut(APIModel):
+    id: str
+    email: str
+    permission: Literal["view", "edit"]
+    status: Literal["pending", "accepted"]
+
+
+class ShareIn(APIModel):
+    email: EmailStr
+    permission: Literal["view", "edit"]
+
+
+class SharePatchIn(APIModel):
+    permission: Literal["view", "edit"]
+
+
+class ShareListOut(APIModel):
+    items: list[ShareOut]
+
+
+class InvitationOut(APIModel):
+    id: str
+    documentId: str
+    documentTitle: str
+    ownerName: str
+    permission: Literal["view", "edit"]
+    status: Literal["pending", "accepted", "declined"]
+
+
+class InvitationListOut(APIModel):
+    items: list[InvitationOut]
 
 
 class DocumentPage(APIModel):
@@ -167,3 +208,149 @@ class DocumentPatchIn(APIModel):
     documentType: str | None = None
     tags: list[str] | None = None
     text: str | None = None
+
+
+def _calendar_date(value: str | None) -> str | None:
+    if value is None:
+        return None
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+        raise ValueError("Use YYYY-MM-DD.")
+    datetime.strptime(value, "%Y-%m-%d")
+    return value
+
+
+class TaskIn(APIModel):
+    description: str = Field(min_length=1, max_length=2000)
+    priority: Literal["low", "medium", "high"]
+    dueDate: str | None
+    sourceDocumentId: str = Field(min_length=1)
+
+    @field_validator("dueDate")
+    @classmethod
+    def due_date(cls, value: str | None) -> str | None:
+        return _calendar_date(value)
+
+    @field_validator("description")
+    @classmethod
+    def description_text(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Description is required.")
+        return cleaned
+
+
+class TaskPatch(APIModel):
+    description: str | None = Field(default=None, min_length=1, max_length=2000)
+    priority: Literal["low", "medium", "high"] | None = None
+    dueDate: str | None = None
+    status: Literal["pending", "completed"] | None = None
+
+    @field_validator("dueDate")
+    @classmethod
+    def due_date(cls, value: str | None) -> str | None:
+        return _calendar_date(value)
+
+    @field_validator("description")
+    @classmethod
+    def description_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Description is required.")
+        return cleaned
+
+
+class TaskOut(APIModel):
+    id: str
+    description: str
+    status: Literal["pending", "completed"]
+    priority: Literal["low", "medium", "high"]
+    dueDate: str | None
+    source: SourceOut
+    meetingId: str | None
+
+
+class TaskPage(APIModel):
+    items: list[TaskOut]
+    total: int
+    page: int
+    pageSize: int
+
+
+class MeetingIn(APIModel):
+    title: str = Field(min_length=1, max_length=200)
+    occurredAt: str = Field(min_length=1)
+
+
+class MeetingOut(APIModel):
+    id: str
+    title: str
+    occurredAt: str
+    summary: str | None
+    decisions: list[str]
+    documents: list[DocumentOut]
+    tasks: list[TaskOut]
+
+
+class MeetingPage(APIModel):
+    items: list[MeetingOut]
+    total: int
+    page: int
+    pageSize: int
+
+
+class MessageOut(APIModel):
+    id: str
+    role: Literal["user", "assistant"]
+    text: str
+    createdAt: str
+    sources: list[SourceOut]
+    insufficientEvidence: bool
+
+
+class ConversationOut(APIModel):
+    id: str
+    title: str
+    updatedAt: str
+    messages: list[MessageOut]
+
+
+class ConversationPage(APIModel):
+    items: list[ConversationOut]
+    total: int
+    page: int
+    pageSize: int
+
+
+class AnswerOut(APIModel):
+    conversationId: str
+    userMessage: MessageOut
+    answer: MessageOut
+
+
+class QueryJobOut(APIModel):
+    id: str
+    status: Literal["queued", "running", "succeeded", "failed", "cancelled"]
+    stage: str
+    conversationId: str | None
+    answer: AnswerOut | None
+    error: str | None
+
+
+class StudyStartIn(APIModel):
+    documentId: str | None = None
+
+    @field_validator("documentId")
+    @classmethod
+    def _document_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if not cleaned or len(cleaned) > 40:
+            raise ValueError("invalid document id")
+        return cleaned
+
+
+class StudyRevisionIn(APIModel):
+    revision: int = Field(ge=1, le=1_000_000)

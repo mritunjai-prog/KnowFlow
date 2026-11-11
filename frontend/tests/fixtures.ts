@@ -12,6 +12,8 @@ import type {
   Conversation,
   Answer,
   Invitation,
+  QueryJob,
+  StudySessionState,
 } from '../src/api/types';
 export const capabilities: Capabilities = {
   acceptedMimeTypes: [
@@ -94,6 +96,8 @@ export async function installApi(page: Page, role: 'user' | 'admin' | 'anonymous
       modelId: null,
     } as Settings,
     conversation: null as Conversation | null,
+    query: null as QueryJob | null,
+    study: { session: null, serverTime: '2026-10-15T09:00:00Z' } as StudySessionState,
     requests: [] as {
       path: string;
       search: string;
@@ -125,9 +129,19 @@ export async function installApi(page: Page, role: 'user' | 'admin' | 'anonymous
       return error(403, 'CSRF rejected');
     if (path === '/session') return send(state.session);
     if (path === '/capabilities') return send(capabilities);
-    if (path === '/auth/login' || path === '/auth/register') {
+    if (path === '/auth/login') {
       if (!body.email || !body.password) return error(422, 'Credentials required');
       state.session.user = user;
+      return send(state.session);
+    }
+    if (path === '/auth/register') {
+      if (!body.email || !body.password || !body.name) return error(422, 'Credentials required');
+      state.session.user = null;
+      return send(state.session, 201);
+    }
+    if (path === '/auth/email-verifications/confirm') {
+      if (!body.token || !body.password) return error(422, 'Verification details required');
+      state.session.user = null;
       return send(state.session);
     }
     if (path === '/auth/logout') {
@@ -254,6 +268,35 @@ export async function installApi(page: Page, role: 'user' | 'admin' | 'anonymous
     if (path === '/conversations')
       return send(collection(state.conversation ? [state.conversation] : [], url));
     if (path === '/conversations/conversation-1') return send(state.conversation);
+    if (path === '/study-sessions/current') return send(state.study);
+    if (path === '/study-sessions' && method === 'POST') {
+      state.study = {
+        serverTime: '2026-10-15T09:00:30Z',
+        session: {
+          id: 'study-1',
+          status: 'active',
+          startedAt: '2026-10-15T09:00:30Z',
+          stoppedAt: null,
+          confirmedThrough: '2026-10-15T09:00:30Z',
+          measuredSeconds: 0,
+          leaseExpiresAt: '2026-10-15T09:02:00Z',
+          pauseReason: null,
+          stopReason: null,
+          documentId: body.documentId || null,
+          revision: 1,
+        },
+      };
+      return send(state.study, 201);
+    }
+    if (path.startsWith('/study-sessions/') && method === 'POST') {
+      const action = path.split('/').at(-1);
+      if (state.study.session) {
+        state.study.session.status =
+          action === 'pause' ? 'paused' : action === 'stop' ? 'completed' : 'active';
+        if (action === 'stop') state.study.session.stoppedAt = state.study.serverTime;
+      }
+      return send(state.study);
+    }
     if (path === '/assistant/query') {
       const userMessage = {
         id: 'message-1',
@@ -278,7 +321,30 @@ export async function installApi(page: Page, role: 'user' | 'admin' | 'anonymous
         messages: [userMessage, answer],
       };
       const result: Answer = { conversationId: 'conversation-1', userMessage, answer };
-      return send(result);
+      state.query = {
+        id: 'query-1',
+        status: 'queued',
+        stage: 'Waiting to answer from authorized documents.',
+        conversationId: 'conversation-1',
+        answer: result,
+        error: null,
+      };
+      return send({ ...state.query, answer: null }, 202);
+    }
+    if (path === '/assistant/queries/query-1') {
+      if (state.query?.status === 'queued')
+        state.query = { ...state.query, status: 'succeeded', stage: 'Answer saved.' };
+      return send(state.query);
+    }
+    if (path === '/assistant/queries/query-1/cancel') {
+      if (state.query)
+        state.query = {
+          ...state.query,
+          status: 'cancelled',
+          stage: 'Cancelled before an answer was saved.',
+          answer: null,
+        };
+      return send(state.query);
     }
     if (path === '/analytics') {
       const result: Analytics = {

@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -8,8 +9,9 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts';
-import { useResource } from '../api/hooks';
-import type { Analytics } from '../api/types';
+import { useAction, useResource } from '../api/hooks';
+import { json, key, query, request } from '../api/client';
+import type { Analytics, StudySessionState } from '../api/types';
 import {
   Page,
   Panel,
@@ -18,16 +20,170 @@ import {
   Empty,
   Field,
   fieldClass,
+  Notice,
 } from '../components/ui/Feedback';
+import { Button } from '../components/ui/Button';
 import { CountUp } from '../components/ui/CountUp';
 import { useFilters } from '../hooks/useFilters';
 import { useAuth } from '../auth/context';
+
+function browserZone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
+}
+
+function StudyTimer() {
+  const [params] = useSearchParams();
+  const documentId = params.get('documentId');
+  const action = useAction();
+  const [tick, setTick] = useState(0);
+  const current = useResource<StudySessionState>('/study-sessions/current');
+  const session = current.data?.session ?? null;
+  const open = session && session.status !== 'completed' ? session : null;
+  const revision = useRef(open?.revision);
+  revision.current = open?.revision;
+  useEffect(() => {
+    if (open?.status !== 'active') return;
+    const timer = setInterval(() => setTick((value) => value + 1), 1000);
+    return () => clearInterval(timer);
+  }, [open?.status, open?.id]);
+  useEffect(() => {
+    if (open?.status !== 'active') return;
+    const beat = setInterval(() => {
+      const presented = revision.current;
+      if (!presented) return;
+      void request<StudySessionState>(`/study-sessions/${key(open.id)}/heartbeat`, {
+        ...json('POST', { revision: presented }),
+        headers: { 'Idempotency-Key': crypto.randomUUID() },
+      })
+        .then(() => current.reload())
+        .catch(() => current.reload());
+    }, 30000);
+    return () => clearInterval(beat);
+  }, [open?.status, open?.id, current]);
+  const elapsed = (() => {
+    if (!open) return 0;
+    if (open.status !== 'active') return open.measuredSeconds;
+    const confirmed = Date.parse(open.confirmedThrough);
+    const server = Date.parse(current.data?.serverTime || '');
+    if (!Number.isFinite(confirmed) || !Number.isFinite(server)) return open.measuredSeconds;
+    const skew = Date.now() - server;
+    const projected = open.measuredSeconds + Math.max(0, (Date.now() - skew - confirmed) / 1000);
+    return Math.max(open.measuredSeconds, Math.floor(Math.min(projected, open.measuredSeconds + 90)));
+  })();
+  void tick;
+  const clock = `${String(Math.floor(elapsed / 60)).padStart(2, '0')}:${String(elapsed % 60).padStart(2, '0')}`;
+  const mutate = (
+    path: string,
+    body: unknown,
+    notice: string,
+  ) => {
+    void action.run(
+      (signal) =>
+        request<StudySessionState>(path, {
+          ...json('POST', body),
+          signal,
+          headers: { 'Idempotency-Key': crypto.randomUUID() },
+        }),
+      () => current.reload(),
+      notice,
+    );
+  };
+  return (
+    <Panel>
+      <h2 className="text-xl font-bold">Recorded study time</h2>
+      <p className="mt-2 text-sm">
+        This is a timer you start. It is not attention, learning, or mastery. Only seconds
+        confirmed by the server are recorded. A missed heartbeat pauses at the last confirmation
+        and does not credit the gap.
+      </p>
+      <p className="my-4 font-heading text-4xl font-bold" aria-live="polite">
+        {open ? clock : '00:00'}
+      </p>
+      <p className="text-sm">
+        {open
+          ? `${open.status === 'active' ? 'Recording' : 'Paused'}. Confirmed ${open.measuredSeconds} seconds.`
+          : 'No open study session.'}
+        {open?.pauseReason === 'connection_lost' ? ' The connection was lost, so the gap was not counted.' : ''}
+        {open?.documentId ? ' Linked to the selected document.' : ''}
+      </p>
+      <div className="mt-4 flex flex-wrap gap-3">
+        {!open && (
+          <Button
+            disabled={action.pending || current.loading}
+            onClick={() =>
+              mutate(
+                '/study-sessions',
+                documentId ? { documentId } : {},
+                'Study session started. Only confirmed seconds will count.',
+              )
+            }
+          >
+            Start
+          </Button>
+        )}
+        {open?.status === 'active' && (
+          <Button
+            variant="secondary"
+            disabled={action.pending}
+            onClick={() =>
+              mutate(
+                `/study-sessions/${key(open.id)}/pause`,
+                { revision: open.revision },
+                'Paused at the last server confirmation.',
+              )
+            }
+          >
+            Pause
+          </Button>
+        )}
+        {open?.status === 'paused' && (
+          <Button
+            disabled={action.pending}
+            onClick={() =>
+              mutate(
+                `/study-sessions/${key(open.id)}/resume`,
+                { revision: open.revision },
+                'Resumed. The paused gap is not counted.',
+              )
+            }
+          >
+            Resume
+          </Button>
+        )}
+        {open && (
+          <Button
+            variant="secondary"
+            disabled={action.pending}
+            onClick={() =>
+              mutate(
+                `/study-sessions/${key(open.id)}/stop`,
+                { revision: open.revision },
+                'Study session stopped.',
+              )
+            }
+          >
+            Stop
+          </Button>
+        )}
+      </div>
+      <ErrorNotice error={current.error} retry={current.reload} />
+      <ErrorNotice error={action.error} />
+      {action.message && <Notice>{action.message}</Notice>}
+    </Panel>
+  );
+}
+
 export function Dashboard() {
   const filters = useFilters();
   const days = ['7', '30', '90'].includes(filters.params.get('days') || '')
     ? filters.params.get('days')!
     : '7';
-  const result = useResource<Analytics>(`/analytics?days=${days}`);
+  const zone = browserZone();
+  const result = useResource<Analytics>(`/analytics${query({ days, timezone: zone })}`);
   const auth = useAuth();
   return (
     <Page
@@ -61,6 +217,7 @@ export function Dashboard() {
           </select>
         </Field>
       </div>
+      <StudyTimer />
       <ErrorNotice error={result.error} retry={result.reload} />
       {result.loading && <Loading />}
       {result.data && (

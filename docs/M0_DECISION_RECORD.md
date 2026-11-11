@@ -150,3 +150,13 @@ Also run, once implementation exists and without cloud spend: password and verif
 - Deployment and a merge to `main`.
 
 The next step is an explicit authorization to begin M1. Until then, the frontend continues to report an unavailable API, and the published contract remains the contract.
+
+## 7. M7 amendment (2026-11-11)
+
+The owner approved M6 and authorized Milestone M7. That authorization is the new decision this record required before a visual index.
+
+- Page images may be sent to `gemini-embedding-2` for visual retrieval, one JPEG region per request, 768 dimensions. This does not replace `gemini-embedding-001` for text. The two models are not mixed, even though both can emit 768 values.
+- `gemini-embedding-2` remains unavailable as a text fallback unless `gemini-embedding-001` itself is unavailable. M7 does not switch the text index.
+- The batch embedding API is still not approved. HTTP 429 stops the item. There is no paid fallback.
+- Free-tier content may still be used to improve Google's products. The earlier limit stands: non-sensitive or synthetic data only.
+- OpenCV content boxes for stored page images are the region source. They do not change the transcription warp path.

@@ -60,9 +60,12 @@ function LoginCard({
 }
 export function Login() {
   const [register, setRegister] = useState(false);
+  const [pendingVerification, setPendingVerification] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [token, setToken] = useState('');
   const reduced = usePrefersReducedMotion();
   const switched = useRef(false);
   const auth = useAuth();
@@ -79,7 +82,17 @@ export function Login() {
   const switchMode = () => {
     switched.current = true;
     setRegister((value) => !value);
+    setPendingVerification(false);
+    setConfirmed(false);
     setPassword('');
+    setToken('');
+    action.clear();
+  };
+  const showPending = () => {
+    switched.current = true;
+    setPendingVerification(true);
+    setPassword('');
+    setToken('');
     action.clear();
   };
   const focusHeading = (element: HTMLElement | null) => {
@@ -149,7 +162,10 @@ export function Login() {
           style={{ perspective: 1000 }}
         >
           <AnimatePresence mode="wait" initial={false}>
-            <LoginCard key={register ? 'register' : 'login'} onReady={focusHeading}>
+            <LoginCard
+              key={pendingVerification ? 'verify' : register ? 'register' : 'login'}
+              onReady={focusHeading}
+            >
               <Link
                 to="/"
                 className="flex w-fit items-center gap-3 font-heading text-2xl font-bold"
@@ -162,9 +178,13 @@ export function Login() {
                 tabIndex={-1}
                 className="mt-8 font-heading text-3xl font-bold tracking-tight sm:text-4xl"
               >
-                {register ? 'Create your account' : 'Welcome back'}
+                {pendingVerification
+                  ? 'Confirm your email'
+                  : register
+                    ? 'Create your account'
+                    : 'Welcome back'}
               </h1>
-              {register && (
+              {(register || pendingVerification) && (
                 <Button
                   variant="ghost"
                   className="mt-3 w-fit"
@@ -181,6 +201,78 @@ export function Login() {
               {auth.loading && <Loading label="Preparing a secure session…" />}
               <ErrorNotice error={auth.error} retry={auth.reload} />
               <ErrorNotice error={action.error} />
+              {pendingVerification ? (
+                <form
+                  className="space-y-4"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (token.trim().length < 20 || !password) return;
+                    void action.run(
+                      (signal) =>
+                        request<Session>('/auth/email-verifications/confirm', {
+                          ...json('POST', { token: token.trim(), password }),
+                          signal,
+                        }),
+                      (session) => {
+                        auth.accept(session);
+                        setPassword('');
+                        setToken('');
+                        if (!session.user) {
+                          setConfirmed(true);
+                          setPendingVerification(false);
+                          setRegister(false);
+                        }
+                      },
+                    );
+                  }}
+                >
+                  <p role="status" className="text-sm text-primary/80">
+                    The account is not signed in yet. Email is not sent. Copy the one-time token
+                    from the KnowFlow server log, then confirm it with the same password. A
+                    confirmed registration still has no signed-in user until you sign in.
+                  </p>
+                  <Field id="token" label="Verification token">
+                    <input
+                      id="token"
+                      className={fieldClass}
+                      value={token}
+                      onChange={(e) => setToken(e.target.value)}
+                      required
+                      minLength={20}
+                      maxLength={200}
+                      autoComplete="one-time-code"
+                      spellCheck={false}
+                    />
+                  </Field>
+                  <Field
+                    id="password"
+                    label="Password"
+                    hint="Use the password from registration, or your current password for an email change."
+                  >
+                    <input
+                      id="password"
+                      className={fieldClass}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      minLength={1}
+                      maxLength={128}
+                      type="password"
+                      autoComplete="current-password"
+                      aria-describedby="password-hint"
+                    />
+                  </Field>
+                  <Button
+                    type="submit"
+                    magnet={!reduced}
+                    whileTap={reduced ? undefined : { scale: 0.98 }}
+                    className="w-full py-4 font-mono shadow-lg"
+                    disabled={auth.loading || !!auth.error || action.pending}
+                  >
+                    {action.pending ? 'Please wait…' : 'Confirm email'}
+                  </Button>
+                </form>
+              ) : (
               <form
                 key={String(register)}
                 className="space-y-4"
@@ -200,6 +292,7 @@ export function Login() {
                     (session) => {
                       auth.accept(session);
                       setPassword('');
+                      if (register && !session.user) showPending();
                     },
                   );
                 }}
@@ -261,16 +354,24 @@ export function Login() {
                   {action.pending ? 'Please wait…' : register ? 'Create account' : 'Sign in'}
                 </Button>
               </form>
-              <Button
-                variant="ghost"
-                className="mt-4 w-full"
-                disabled={action.pending}
-                onClick={switchMode}
-              >
-                {register
-                  ? 'Already have an account? Sign in'
-                  : 'New to KnowFlow? Create an account'}
-              </Button>
+              )}
+              {!pendingVerification && (
+                <Button
+                  variant="ghost"
+                  className="mt-4 w-full"
+                  disabled={action.pending}
+                  onClick={switchMode}
+                >
+                  {register
+                    ? 'Already have an account? Sign in'
+                    : 'New to KnowFlow? Create an account'}
+                </Button>
+              )}
+              {confirmed && !auth.user && (
+                <p className="mt-4 text-sm" role="status">
+                  Email confirmed. No user is signed in. Sign in with the same email and password.
+                </p>
+              )}
               <p className="mt-6 text-sm text-primary/80">
                 Accounts require the KnowFlow backend. No demonstration login is enabled.
               </p>

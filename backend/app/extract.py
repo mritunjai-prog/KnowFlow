@@ -22,6 +22,9 @@ def detect_media(data: bytes, filename: str) -> str | None:
         return "image/jpeg"
     if data.startswith(b"RIFF") and data[8:12] == b"WEBP":
         return "image/webp"
+    audio = _audio_media(data, filename)
+    if audio:
+        return audio
     if data.startswith(b"PK") and _is_docx(data):
         return DOCX
     if b"\x00" not in data and filename.lower().endswith((".txt", ".text", ".md")):
@@ -30,6 +33,28 @@ def detect_media(data: bytes, filename: str) -> str | None:
         except UnicodeDecodeError:
             return None
         return "text/plain"
+    return None
+
+
+def _audio_media(data: bytes, filename: str) -> str | None:
+    name = filename.lower()
+    if data.startswith(b"RIFF") and data[8:12] == b"WAVE":
+        return "audio/wav"
+    if data.startswith(b"fLaC"):
+        return "audio/flac"
+    if data.startswith(b"OggS"):
+        return "audio/ogg"
+    if data.startswith(b"\x1a\x45\xdf\xa3") and not name.endswith((".mkv", ".mk3")):
+        return "audio/webm"
+    if data.startswith(b"ID3") or (len(data) >= 2 and data[0] == 0xFF and data[1] & 0xE0 == 0xE0 and name.endswith((".mp3", ".mpeg", ".mpga"))):
+        return "audio/mpeg"
+    if len(data) >= 12 and data[4:8] == b"ftyp":
+        brand = data[8:12]
+        compatible = data[16:32]
+        audio_brands = (b"M4A ", b"M4B ", b"mp42", b"isom", b"iso2", b"mp41")
+        if brand in audio_brands or any(item in compatible for item in audio_brands):
+            if name.endswith((".m4a", ".mp4", ".m4b", ".mp4a")) or brand in (b"M4A ", b"M4B "):
+                return "audio/mp4"
     return None
 
 

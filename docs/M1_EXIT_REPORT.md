@@ -41,6 +41,10 @@ No application module calls Gemini, Groq, or another provider. Catalog model ids
 
 The published Login page calls `auth.accept` only when registration returns a `Session`. With `user: null`, it does not navigate into the app and it does not show the log instruction, because a successful `Session` has no message field. The owner must read the server stdout until a later, separately authorized contract and Login change adds a pending-verification state.
 
+M4 adds a second recorded gap, not a published-contract edit. `docs/openapi.json` says `POST /assistant/query` returns `200 Answer`. The approved M0 decision is a short `202` with a query id, then poll and cancel, because the Netlify proxy times out at 26 seconds. M4 implements that approved flow. `GET /assistant/queries/{id}` and `POST /assistant/queries/{id}/cancel` are not in the frozen operation list. Their poll body is not the published `Answer` object; a finished poll carries `Answer` inside a query-status object. `docs/openapi.json` and `frontend/` were not edited.
+
+M9 adds a third recorded gap, not a published-contract edit. The study-session routes below are not in the frozen operation list. `GET /analytics` also accepts an optional IANA `timezone` query. The published `Analytics` object is unchanged: no `studyTime` object was added, because that object is not in the frozen schema. The route list and counting rules are in `docs/M9_EXIT_REPORT.md`. `docs/openapi.json` and `frontend/` were not edited.
+
 ## Not done
 
 - No Render, Neon, Cloudflare, Gemini, or Groq call.

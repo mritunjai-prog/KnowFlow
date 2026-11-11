@@ -9,6 +9,7 @@ from app.acl import can_edit, can_read, permission_for
 from app.catalog import DOCUMENT_TYPES, MAX_TEXT_CHARACTERS
 from app.deps import mutation_actor, reader
 from app.errors import error_response
+from app.indexing import sync_chunks
 from app.models import Document, DocumentGrant, TimelineEvent
 from app.schemas import DocumentOut, DocumentPage, DocumentPatchIn, FileSourceOut, SourceOut, TimelineOut, TimelinePage
 from app.security import utcnow
@@ -43,7 +44,7 @@ def document_out(request: Request, document: Document, permission: str) -> Docum
         processed=_file(store, document.processed_key, "processed.jpg", "image/jpeg"),
         thumbnailUrl=store.signed_url(document.thumbnail_key, "thumbnail.jpg", "image/jpeg") if document.thumbnail_key else None,
         summary=document.summary,
-        meetingId=document.meeting_id,
+        meetingId=document.meeting_id if permission == "owner" else None,
         permission=permission,
     )
 
@@ -138,18 +139,31 @@ def patch_document(document_id: str, body: DocumentPatchIn, request: Request):
         return error_response(422, "VALIDATION_ERROR", "The request is invalid.", request, {"tags": "Tags must be unique text."})
     if body.text is not None and len(body.text) > MAX_TEXT_CHARACTERS:
         return error_response(413, "PAYLOAD_TOO_LARGE", "The text is longer than the configured limit.", request)
-    if body.title is not None:
+    changed = False
+    text_changed = body.text is not None and body.text != document.text
+    if body.title is not None and body.title.strip() != document.title:
         document.title = body.title.strip()
-    if body.documentType is not None:
+        changed = True
+    if body.documentType is not None and body.documentType != document.document_type:
         document.document_type = body.documentType
-    if body.tags is not None:
+        document.type_locked = True
+        document.labels_origin = "corrected"
+        changed = True
+    if body.tags is not None and json.dumps(body.tags) != (document.tags or "[]"):
         document.tags = json.dumps(body.tags)
-    if body.text is not None:
+        document.tags_locked = True
+        document.labels_origin = "corrected"
+        changed = True
+    if body.text is not None and body.text != document.text:
         document.text = body.text
-    document.updated_at = utcnow()
-    document.index_state = "pending"
-    event = db.scalar(select(TimelineEvent).where(TimelineEvent.document_id == document.id))
-    if event:
+        changed = True
+    if changed:
+        document.updated_at = utcnow()
+        document.index_version = int(document.index_version or 0) + 1
+        document.index_state = "stale"
+        document.retrieval_invalidated_at = utcnow()
+        sync_chunks(db, document, text_changed=text_changed, queue=text_changed)
+    for event in db.scalars(select(TimelineEvent).where(TimelineEvent.document_id == document.id)).all():
         event.title = document.title
         event.type = document.document_type
         event.excerpt = (document.text or "")[:240]
@@ -217,7 +231,7 @@ def timeline(
                 title=row.title,
                 type=row.type,
                 source=SourceOut(**source),
-                meetingId=row.meeting_id,
+                meetingId=row.meeting_id if document.owner_id == user.id else None,
             )
         )
     return TimelinePage(items=items, total=int(total), page=page, pageSize=pageSize)

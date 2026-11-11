@@ -1,14 +1,15 @@
 import hashlib
 import json
-from datetime import datetime
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import Response
 from sqlalchemy import func, select
 
 from app.catalog import (
+    ACCEPTED_AUDIO,
     ACCEPTED_IMAGES,
     DOCUMENT_TYPES,
+    GROQ_MAX_AUDIO_BYTES,
     MAX_BATCH_FILES,
     MAX_FILE_BYTES,
     MAX_TEXT_CHARACTERS,
@@ -96,6 +97,10 @@ async def ingest(
     bodies: list[tuple[str, bytes, str | None]] = []
     for upload in uploads:
         data = await upload.read()
+        if len(data) > GROQ_MAX_AUDIO_BYTES and (upload.filename or "").lower().endswith(
+            (".webm", ".ogg", ".mp3", ".wav", ".flac", ".m4a", ".mp4", ".m4b", ".mpeg")
+        ):
+            return error_response(413, "PAYLOAD_TOO_LARGE", "Audio files must be 25 MB or smaller.", request)
         if len(data) > MAX_FILE_BYTES:
             return error_response(413, "PAYLOAD_TOO_LARGE", "A file exceeds the size limit.", request)
         try:
@@ -136,7 +141,9 @@ async def ingest(
             {
                 "title": title,
                 "documentType": parsed["documentType"] or "other",
+                "typeChosen": parsed["documentType"] is not None,
                 "tags": [item.strip() for item in tags if item.strip()],
+                "tagsChosen": any(item.strip() for item in tags),
                 "many": len(bodies) + (1 if cleaned_text else 0) > 1,
             }
         ),
@@ -181,11 +188,23 @@ async def ingest(
             item.status = "failed"
             item.error = "The file type is not supported or does not match its contents."
             item.step = "done"
+        elif media in ACCEPTED_AUDIO and not getattr(request.app.state, "speech", None):
+            item.status = "failed"
+            item.error = "Audio transcription is not configured."
+            item.step = "done"
+        elif media in ACCEPTED_AUDIO and not request.app.state.speech.configured:
+            item.status = "failed"
+            item.error = "Audio transcription is not configured."
+            item.step = "done"
+        elif media in ACCEPTED_AUDIO and not _audio_enabled(db):
+            item.status = "failed"
+            item.error = "Audio capture is not enabled."
+            item.step = "done"
         elif media in ACCEPTED_IMAGES and not request.app.state.transcriber.configured:
             item.status = "failed"
             item.error = "Page transcription is not configured."
             item.step = "done"
-        elif media not in ACCEPTED_IMAGES and media not in {"application/pdf", "text/plain", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}:
+        elif media not in ACCEPTED_IMAGES and media not in ACCEPTED_AUDIO and media not in {"application/pdf", "text/plain", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}:
             item.status = "failed"
             item.error = "This file type is not supported."
             item.step = "done"
@@ -217,30 +236,9 @@ async def ingest(
 
 
 def _meeting(db, owner_id: str, parsed: dict) -> tuple[Meeting | None, tuple | None]:
-    meeting_id = parsed["meetingId"]
-    title = parsed["meetingTitle"]
-    occurred = parsed["occurredAt"]
-    if meeting_id and (title or occurred):
-        return None, (422, "VALIDATION_ERROR", "Send either a meeting id or a new meeting, not both.")
-    if meeting_id:
-        meeting = db.get(Meeting, meeting_id)
-        if meeting is None or meeting.owner_id != owner_id:
-            return None, (404, "NOT_FOUND", "That meeting is not available.")
-        return meeting, None
-    if title or occurred:
-        if not title or not occurred:
-            return None, (422, "VALIDATION_ERROR", "A new meeting needs a title and time.")
-        try:
-            when = datetime.fromisoformat(str(occurred).replace("Z", "+00:00"))
-        except ValueError:
-            return None, (422, "VALIDATION_ERROR", "The meeting time is invalid.")
-        if when.tzinfo is None:
-            return None, (422, "VALIDATION_ERROR", "The meeting time must include a timezone.")
-        meeting = Meeting(id=new_id(), owner_id=owner_id, title=str(title)[:200], occurred_at=when, created_at=utcnow())
-        db.add(meeting)
-        db.flush()
-        return meeting, None
-    return None, None
+    from app.meetings import attach_meeting
+
+    return attach_meeting(db, owner_id, parsed["meetingId"], parsed["meetingTitle"], parsed["occurredAt"])
 
 
 @router.get("/jobs/{job_id}")
@@ -252,7 +250,19 @@ def get_job(job_id: str, request: Request):
     if job is None or job.owner_id != actor.user.id:
         return error_response(404, "NOT_FOUND", "That job is not available.", request)
     if job.status in {"queued", "running"} or job.cancel_requested:
-        advance(request.state.db, request.app.state.store, request.app.state.transcriber, job)
+        advance(
+            request.state.db,
+            request.app.state.store,
+            request.app.state.transcriber,
+            request.app.state.classifier,
+            job,
+            request.app.state.embedder,
+            request.app.state.generator,
+            request.app.state.speech,
+            getattr(request.app.state, "visual", None),
+        )
+        request.state.db.expire_all()
+        job = request.state.db.get(Job, job_id)
     return job_out(request.state.db, job)
 
 
@@ -290,14 +300,38 @@ def retry_job(job_id: str, request: Request):
     for item in failed:
         item.status = "queued"
         item.error = None
-        item.step = "extract"
-        item.page_index = 0
-        item.page_count = 0
-        item.partial_text = ""
         item.attempts = 0
-        item.processed_key = None
-        item.thumbnail_key = None
-        item.preprocess_note = None
+        if item.kind == "summary":
+            item.step = "summarize"
+            continue
+        if item.kind == "summary-tasks":
+            item.step = "tasks"
+            item.page_index = 0
+            item.actions_json = "[]"
+            try:
+                meta = json.loads(job.payload_json or "{}")
+            except json.JSONDecodeError:
+                meta = {}
+            if isinstance(meta, dict):
+                meta["docIndex"] = 0
+                meta["pageIndex"] = 0
+                job.payload_json = json.dumps(meta)
+            continue
+        if item.step == "visual" and item.document_id:
+            item.step = "visual"
+            continue
+        if item.document_id:
+            item.step = "actions"
+        elif item.partial_text:
+            item.step = "classify"
+        else:
+            item.step = "extract"
+            item.page_index = 0
+            item.page_count = 0
+            item.partial_text = ""
+            item.processed_key = None
+            item.thumbnail_key = None
+            item.preprocess_note = None
     job.status = "queued"
     job.retryable = False
     job.error = None
@@ -305,6 +339,42 @@ def retry_job(job_id: str, request: Request):
     job.progress = 0
     job.cancel_requested = False
     return job_out(db, job)
+
+
+def _audio_enabled(db) -> bool:
+    config = db.get(ServiceConfig, 1)
+    if config is None:
+        return True
+    try:
+        enabled = json.loads(config.capture_sources)
+    except json.JSONDecodeError:
+        return False
+    if not isinstance(enabled, list):
+        return False
+    return "audio" in enabled or "file" in enabled
+
+
+def _byte_range(data: bytes, header: str | None) -> tuple[int, bytes, dict[str, str]]:
+    total = len(data)
+    base = {"Accept-Ranges": "bytes"}
+    if not header or not header.startswith("bytes="):
+        return 200, data, base
+    spec = header.removeprefix("bytes=").split(",", 1)[0]
+    start_text, _, end_text = spec.partition("-")
+    try:
+        if start_text == "":
+            length = int(end_text)
+            start = max(0, total - length)
+            end = total - 1
+        else:
+            start = int(start_text)
+            end = int(end_text) if end_text else total - 1
+    except ValueError:
+        return 200, data, base
+    if start < 0 or start >= total or end < start:
+        return 416, b"", {**base, "Content-Range": f"bytes */{total}"}
+    end = min(end, total - 1)
+    return 206, data[start : end + 1], {**base, "Content-Range": f"bytes {start}-{end}/{total}"}
 
 
 @router.get("/files/{token}")
@@ -316,8 +386,8 @@ def read_file(token: str, request: Request):
     except StorageError:
         return error_response(404, "NOT_FOUND", "That file is not available.", request)
     safe = name.replace('"', "")[:180] or "file"
-    return Response(
-        content=data,
-        media_type=stored_type or media_type,
-        headers={"Content-Disposition": f'inline; filename="{safe}"', "Cache-Control": "private, max-age=60"},
-    )
+    status, body, extra = _byte_range(data, request.headers.get("range"))
+    headers = {"Content-Disposition": f'inline; filename="{safe}"', "Cache-Control": "private, max-age=60", **extra}
+    if status == 416:
+        return Response(status_code=416, headers=headers)
+    return Response(content=body, status_code=status, media_type=stored_type or media_type, headers=headers)

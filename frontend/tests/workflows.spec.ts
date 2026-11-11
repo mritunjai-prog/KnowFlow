@@ -125,6 +125,7 @@ test('assistant sends evidence context, saves conversation and links sources', a
       buffer: Buffer.from([137, 80, 78, 71]),
     });
   await page.getByRole('button', { name: 'Send question' }).click();
+  await expect(page.getByRole('button', { name: 'Cancel question' })).toBeVisible();
   await expect(page.getByText('Finish the assignment on Friday.', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Lecture notes · page 1' })).toHaveAttribute(
     'href',
@@ -211,6 +212,7 @@ test('keyboard links, counters and unavailable WebGL recover', async ({ page }) 
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/dashboard');
   await expect(page.getByText('84', { exact: true })).toBeVisible({ timeout: 8000 });
+  await expect(page.getByRole('button', { name: 'Start' })).toBeVisible();
   await page.getByRole('link', { name: 'Capture', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: 'Capture knowledge' })).toBeVisible();

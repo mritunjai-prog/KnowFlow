@@ -102,6 +102,130 @@ def _limit(image, max_pixels: int):
     return cv2.resize(image, (max(1, int(width * scale)), max(1, int(height * scale))))
 
 
+def valid_region(region) -> bool:
+    if not isinstance(region, (list, tuple)) or len(region) != 4:
+        return False
+    try:
+        x, y, width, height = (float(item) for item in region)
+    except (TypeError, ValueError):
+        return False
+    if any(item != item for item in (x, y, width, height)):
+        return False
+    if width <= 0 or height <= 0 or x < -0.001 or y < -0.001:
+        return False
+    if x + width > 1.001 or y + height > 1.001:
+        return False
+    return True
+
+
+def content_regions(jpeg: bytes) -> list[tuple[float, float, float, float]]:
+    """Normalized content boxes on one stored page. The full page is the fallback."""
+    import cv2
+    import numpy as np
+
+    image = cv2.imdecode(np.frombuffer(jpeg, dtype=np.uint8), cv2.IMREAD_COLOR)
+    if image is None:
+        raise ImageError("The page image could not be read.")
+    height, width = image.shape[:2]
+    if height * width > MAX_INPUT_PIXELS:
+        raise ImageError("The page image exceeds the 20 megapixel limit.")
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(cv2.GaussianBlur(gray, (5, 5), 0), 40, 120)
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    boxes: list[tuple[float, float, float, float]] = []
+    page_area = float(height * width)
+    for contour in contours:
+        left, top, box_width, box_height = cv2.boundingRect(contour)
+        if box_width < 16 or box_height < 16:
+            continue
+        area = box_width * box_height
+        if area < page_area * 0.02 or area > page_area * 0.85:
+            continue
+        region = _clamp_region(left / width, top / height, box_width / width, box_height / height)
+        if region is not None:
+            boxes.append(region)
+    merged = _merge_regions(boxes)[:4]
+    return merged or [(0.0, 0.0, 1.0, 1.0)]
+
+
+def crop_jpeg(jpeg: bytes, region) -> bytes:
+    import cv2
+    import numpy as np
+
+    if not valid_region(region):
+        raise ImageError("The stored region is not a normalized box.")
+    image = cv2.imdecode(np.frombuffer(jpeg, dtype=np.uint8), cv2.IMREAD_COLOR)
+    if image is None:
+        raise ImageError("The page image could not be read.")
+    height, width = image.shape[:2]
+    x, y, box_width, box_height = (float(item) for item in region)
+    left = max(0, min(width - 1, int(round(x * width))))
+    top = max(0, min(height - 1, int(round(y * height))))
+    right = max(left + 1, min(width, int(round((x + box_width) * width))))
+    bottom = max(top + 1, min(height, int(round((y + box_height) * height))))
+    crop = _limit(image[top:bottom, left:right], 1_000_000)
+    ok, encoded = cv2.imencode(".jpg", crop, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+    if not ok:
+        raise ImageError("The page region could not be prepared.")
+    return encoded.tobytes()
+
+
+def query_jpeg(data: bytes) -> bytes:
+    """Validate a query image and return one limited JPEG. Does not call a provider."""
+    import cv2
+    import numpy as np
+
+    from app.extract import detect_media
+
+    if len(data) > 25 * 1024 * 1024:
+        raise ImageError("The query image exceeds the upload limit.")
+    media = detect_media(data, "query.png")
+    if media not in {"image/png", "image/jpeg", "image/webp"}:
+        raise ImageError("The query image must be PNG, JPEG, or WebP.")
+    image = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_COLOR)
+    if image is None:
+        raise ImageError("The query image could not be read.")
+    height, width = image.shape[:2]
+    if height * width > MAX_INPUT_PIXELS:
+        raise ImageError("The query image exceeds the 20 megapixel limit.")
+    limited = _limit(image, 1_000_000)
+    ok, encoded = cv2.imencode(".jpg", limited, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+    if not ok:
+        raise ImageError("The query image could not be prepared.")
+    return encoded.tobytes()
+
+
+def _clamp_region(x: float, y: float, width: float, height: float):
+    x = min(1.0, max(0.0, x))
+    y = min(1.0, max(0.0, y))
+    width = min(1.0 - x, max(0.0, width))
+    height = min(1.0 - y, max(0.0, height))
+    if width < 0.01 or height < 0.01:
+        return None
+    return (round(x, 6), round(y, 6), round(width, 6), round(height, 6))
+
+
+def _merge_regions(boxes: list[tuple[float, float, float, float]]):
+    kept: list[tuple[float, float, float, float]] = []
+    for box in sorted(boxes, key=lambda item: item[2] * item[3], reverse=True):
+        if any(_iou(box, other) > 0.5 for other in kept):
+            continue
+        kept.append(box)
+    return kept
+
+
+def _iou(left, right) -> float:
+    ax, ay, aw, ah = left
+    bx, by, bw, bh = right
+    ix = max(0.0, min(ax + aw, bx + bw) - max(ax, bx))
+    iy = max(0.0, min(ay + ah, by + bh) - max(ay, by))
+    intersection = ix * iy
+    union = aw * ah + bw * bh - intersection
+    if union <= 0:
+        return 0.0
+    return intersection / union
+
+
 def _edge(image, edge: int):
     import cv2
 

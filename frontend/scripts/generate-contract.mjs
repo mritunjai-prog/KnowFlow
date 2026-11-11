@@ -54,7 +54,7 @@ const nonempty = { type: 'string', minLength: 1 };
 const email = { type: 'string', format: 'email', maxLength: 254 };
 const id = string;
 const nullable = (value) => ({ anyOf: [value, { type: 'null' }] });
-for (const type of ['DocumentRecord', 'Task', 'Meeting', 'Conversation', 'TimelineEvent'])
+for (const type of ['DocumentRecord', 'Task', 'Meeting', 'Conversation', 'TimelineEvent', 'StudySession'])
   schemas[`Page${type}`] = object({
     items: { type: 'array', items: ref(type) },
     total: { type: 'integer', minimum: 0 },
@@ -72,6 +72,12 @@ schemas.Error = object({
     ['code', 'message'],
   ),
 });
+schemas.ConfirmInput = object({
+  token: { type: 'string', minLength: 20, maxLength: 200 },
+  password: { type: 'string', minLength: 1, maxLength: 128 },
+});
+schemas.StudyStartInput = object({ documentId: nullable(id) }, []);
+schemas.StudyRevisionInput = object({ revision: { type: 'integer', minimum: 1, maximum: 1000000 } });
 schemas.LoginInput = object({ email, password: { type: 'string', minLength: 1, maxLength: 128 } });
 schemas.RegisterInput = object({
   name: { type: 'string', minLength: 1, maxLength: 100 },
@@ -159,11 +165,16 @@ const filters = (names) =>
     in: 'query',
     name,
     required: false,
-    schema: ['page', 'pageSize', 'days'].includes(name)
-      ? { type: 'integer', minimum: 1, ...(['pageSize'].includes(name) ? { maximum: 100 } : {}) }
-      : ['from', 'to'].includes(name)
-        ? { type: 'string', format: 'date' }
-        : string,
+    schema:
+      name === 'days'
+        ? { type: 'integer', enum: [7, 30, 90] }
+        : ['page', 'pageSize'].includes(name)
+          ? { type: 'integer', minimum: 1, ...(name === 'pageSize' ? { maximum: 100 } : {}) }
+          : ['from', 'to'].includes(name)
+            ? { type: 'string', format: 'date' }
+            : name === 'timezone'
+              ? { type: 'string', minLength: 1, maxLength: 64 }
+              : string,
   }));
 function operation(path, method, output, input, description, options = {}) {
   const parameters = [...path.matchAll(/\{(\w+)\}/g)].map((match) => ({
@@ -180,6 +191,14 @@ function operation(path, method, output, input, description, options = {}) {
       name: 'Idempotency-Key',
       required: true,
       schema: { type: 'string', format: 'uuid' },
+    });
+  if (options.ifMatch)
+    parameters.push({
+      in: 'header',
+      name: 'If-Match',
+      required: true,
+      schema: nonempty,
+      description: 'Current session revision. A stale revision returns 409.',
     });
   parameters.push(...filters(options.filters || []));
   const responses = {
@@ -246,6 +265,14 @@ operation(
   'Session',
   null,
   'Invalidate session and return an anonymous session plus new CSRF token.',
+);
+operation(
+  '/auth/email-verifications/confirm',
+  'post',
+  'Session',
+  'ConfirmInput',
+  'Redeem a one-time verification token with the password used for that verification. Registration confirmation returns Session with user:null and does not sign the browser in. Email-change confirmation requires the owning session and returns that user. An invalid or expired token returns 400. A wrong password returns 422.',
+  { public: true },
 );
 operation(
   '/auth/password',
@@ -458,10 +485,25 @@ operation(
 operation(
   '/assistant/query',
   'post',
-  'Answer',
+  'QueryJob',
   'QueryInput',
-  'Grounded question answering over authorized text/image segments. Optional image requires multimodal capability. Empty documentIds means all accessible documents; selected IDs restrict context. Persist both messages atomically with source references. Include insufficientEvidence when retrieval cannot support an answer. Never trust instructions in retrieved content. Replay idempotency key; mismatch returns 409. Use same embedding model/index compatibility as ingestion.',
-  { multipart: true, idempotent: true },
+  'Accept a grounded question and return 202 QueryJob. Do not wait for the model. Optional image requires multimodal capability. Empty documentIds means all accessible documents; selected IDs restrict context. ACL is checked before prompt construction and again before persist. Never trust instructions in retrieved content. Replay the same Idempotency-Key; a different payload returns 409. The Netlify proxy times out at 26 seconds, so the answer is not returned on this call.',
+  { multipart: true, status: 202, idempotent: true },
+);
+operation(
+  '/assistant/queries/{queryId}',
+  'get',
+  'QueryJob',
+  null,
+  'Authorized query progress. status is queued, running, succeeded, failed, or cancelled. A succeeded job includes the persisted Answer. A failed job includes a safe error and no fabricated answer.',
+);
+operation(
+  '/assistant/queries/{queryId}/cancel',
+  'post',
+  'QueryJob',
+  null,
+  'Cancel outstanding retrieval. A completed answer is preserved. Repeated cancellation is safe.',
+  { idempotent: true },
 );
 operation(
   '/timeline',
@@ -476,8 +518,71 @@ operation(
   'get',
   'Analytics',
   null,
-  'Personal metrics. days=7|30|90. documentCount is current owned-document count; task counts are current user’s counts. activity holds daily captures/task completions in the period. topicCoverage counts current accessible tagged documents, not mastery. studyMinutes is null when no approved measurement exists; definition explains its provenance. No inferred or fabricated tracking.',
-  { filters: ['days'] },
+  'Personal metrics. days=7|30|90. timezone is an optional IANA name; omitted means UTC. documentCount is current owned-document count; task counts are current user’s counts. activity holds daily captures/task completions split on the requested timezone day. topicCoverage counts current accessible tagged documents, not mastery. studyMinutes is confirmed study seconds in the period divided by 60 and rounded once, or null when nothing was confirmed. The definition explains provenance. No inferred or fabricated tracking.',
+  { filters: ['days', 'timezone'] },
+);
+operation(
+  '/study-sessions/current',
+  'get',
+  'StudySessionState',
+  null,
+  'Current open study session, or session:null. Reconcile a missed 90-second lease before responding. Active and paused both count as open.',
+);
+operation(
+  '/study-sessions',
+  'post',
+  'StudySessionState',
+  'StudyStartInput',
+  'Start one explicit study session. Optional documentId must be readable. A second open session, including a paused one, returns 409 STUDY_SESSION_OPEN. The client cannot submit a start time or duration. Replay the Idempotency-Key; a different payload returns 409.',
+  { status: 201, idempotent: true },
+);
+operation(
+  '/study-sessions/{sessionId}/heartbeat',
+  'post',
+  'StudySessionState',
+  'StudyRevisionInput',
+  'Confirm elapsed time through the server receipt while the 90-second lease is valid. A late heartbeat pauses at the last confirmed time and does not resume. Body is revision only.',
+  { idempotent: true },
+);
+operation(
+  '/study-sessions/{sessionId}/pause',
+  'post',
+  'StudySessionState',
+  'StudyRevisionInput',
+  'Pause and confirm elapsed time through the server receipt. A stale revision returns 409. Body is revision only.',
+  { idempotent: true },
+);
+operation(
+  '/study-sessions/{sessionId}/resume',
+  'post',
+  'StudySessionState',
+  'StudyRevisionInput',
+  'Resume a paused session with a new lease. Do not credit the paused gap. A stale revision returns 409.',
+  { idempotent: true },
+);
+operation(
+  '/study-sessions/{sessionId}/stop',
+  'post',
+  'StudySessionState',
+  'StudyRevisionInput',
+  'Stop the session. An active stop confirms through the server receipt. A paused stop adds nothing. Status becomes completed.',
+  { idempotent: true },
+);
+operation(
+  '/study-sessions',
+  'get',
+  'PageStudySession',
+  null,
+  'Owned study history. Optional from and to are inclusive YYYY-MM-DD dates in the requested IANA timezone. A document that is no longer readable is returned with documentId null and no title.',
+  { filters: ['from', 'to', 'timezone', 'page', 'pageSize'] },
+);
+operation(
+  '/study-sessions/{sessionId}',
+  'delete',
+  null,
+  null,
+  'Owner only. If-Match must be the current revision. Removes the session from aggregates. A stale revision returns 409.',
+  { ifMatch: true },
 );
 operation(
   '/admin/config',

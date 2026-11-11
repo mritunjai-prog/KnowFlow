@@ -1,11 +1,11 @@
 # KnowFlow Project Memory
 
-_Read this first. Updated when M0 was closed on 2026-11-10._
+_Read this first. Updated when the pre-M10 embedding and audit fixes were applied locally on 2026-11-11._
 
 ## Authority and approved scope
 
 - Personal knowledge/productivity project. The BRD PDF in the repository wins over README/design exports and earlier “enterprise” language.
-- User requested five gated phases. Phases 1–3 (understanding, grouped doubts, read-only audit) were completed before edits. Phase 4 was explicitly approved for **all 41 findings/all four groups**, including every BRD future feature. Phase 5 planning is approved in principle and Milestone M0 is closed in `docs/M0_DECISION_RECORD.md`. M1 was later authorized and its exit result is in `docs/M1_EXIT_REPORT.md`. M2 is implemented locally; its exit result is in `docs/M2_EXIT_REPORT.md` and awaits approval. Contract edits, deployment, and a `main` merge are not authorized. M3+ is not authorized.
+- User requested five gated phases. Phases 1–3 (understanding, grouped doubts, read-only audit) were completed before edits. Phase 4 was explicitly approved for **all 41 findings/all four groups**, including every BRD future feature. Phase 5 planning is approved in principle and Milestone M0 is closed in `docs/M0_DECISION_RECORD.md`. M1–M9 exits are approved. M2 is the last pushed commit. M3–M9 and the later contract sync remain unpushed. The owner authorized the M1/M4/M7/M9 contract and frontend sync, then the pre-M10 embedding and audit fixes. Deployment and a `main` merge are not authorized.
 - Full required frontend, not an MVP: authentication/User/Admin, ingestion/camera/OCR-review UI, classification corrections, meetings, tasks, library/timeline, grounded assistant, settings/onboarding, audio transcription UI, multimodal query/citation UI, collaboration and personal analytics.
 - BRD §14 p8 says “Collaborative use cases (sharing workspaces with classmates or team members).” This was quoted and clarified with the user. The explicit answer was **selected-document sharing with permission control, not shared workspaces**. Implemented owner/view/edit grants, recipient invitations and revocation UI.
 - Netlify frontend; Render free web service approved for the backend. Gemini and Groq are approved only for the uses and non-sensitive data named in `docs/M0_DECISION_RECORD.md`. Browser configuration contains public API settings only; the backend owns credentials, adapters, storage, and ML.
@@ -18,7 +18,7 @@ API-driven React/TypeScript SPA. Runtime dependencies remain React/React DOM, Re
 
 All domain routes are lazy loaded. Session/CSRF and role guards are in `frontend/src/auth/`; shared DTOs/client/resource/action hooks in `src/api/`. Domain screens and shared form/feedback/media/sharing components use that boundary. Raw Three.js landing hero and restored Login network are separate optional-motion lazy imports; shader/Three resources have cleanup, reduced-motion/static failure paths and visibility suspension. Inert enterprise claims/controls and externally hosted decorative font/image dependencies were removed.
 
-The backend is **not implemented**. Live authenticated persistence, OCR/transcription/classification/RAG, real metrics and authorization require the later service. The frontend honestly reports unavailability until connected. The formal provider-neutral handoff is `docs/openapi.json` plus `docs/BACKEND_HANDOFF.md`; do not replace it with a production mock store.
+The frontend still reports an unavailable API until it is connected. M1–M3 exist locally in `backend/` and are not deployed. RAG, meeting summaries, audio, sharing routes, and analytics are not implemented. The formal provider-neutral handoff is `docs/openapi.json` plus `docs/BACKEND_HANDOFF.md`; do not replace it with a production mock store.
 
 ### Key locations
 
@@ -165,6 +165,74 @@ The owner authorized the trusted-service foundation only. The result is `docs/M1
 
 - One FastAPI app, SQLAlchemy, and Alembic live under `backend/`. Tests use a temporary SQLite file. Neon was not connected, and nothing was deployed.
 - `POST /auth/register` returns the published `201 Session` shape with `user: null`. An unverified account does not receive an authenticated session. The one-time token is printed to stdout. `POST /auth/email-verifications/confirm` is the handoff redemption path and is not in the frozen frontend operation list.
+- M4 contract delta, recorded beside this gap and not applied to `docs/openapi.json` or `frontend/`: published `POST /assistant/query` returns `200 Answer`. The approved M0 flow is `202` plus a query id, `GET /assistant/queries/{id}`, and `POST /assistant/queries/{id}/cancel`. A finished poll contains `Answer`; it is not itself `Answer`.
+- M9 contract delta, recorded beside the M1 and M4 gaps and not applied to `docs/openapi.json` or `frontend/`: study-session routes are new. `GET /analytics` also accepts optional `timezone`. The published `Analytics` response shape is unchanged. Details are in `docs/M9_EXIT_REPORT.md`.
 - Isolated pytest result: **14 passed, 1 warning**. The warning is Starlette's deprecation of `httpx` with `TestClient`. No Gemini, Groq, or file-processing call exists in this milestone.
 - The published Login page will not explain the log token, because a successful `Session` has no message field and the frontend was not edited. That integration gap remains.
 - This work is local and uncommitted. `origin/arena/d9bd44f3-knowflow` remains `f925831`. `main` was not changed.
+
+## M5 exit (2026-11-11)
+
+The owner approved M4 and authorized the meeting workflow only. The result is `docs/M5_EXIT_REPORT.md`.
+
+- `/api/v1/meetings*` lists, creates, and returns the current user's meetings. Intake with the same label and time reuses that user's earliest matching session. A shared artifact does not reveal the meeting, sibling artifacts, or the owner's tasks.
+- Summary is a resumable job: one grounded generation step, then one task-extraction step per page. Decisions must be sentences copied from that meeting's owned artifacts. Corrected text makes the previous summary stale. Re-summary uses M3 fingerprints and does not duplicate tasks or overwrite edits.
+- No frontend or OpenAPI edit. Full local pytest: **43 passed, 1 warning**. No Gemini, Groq, R2, or Neon call.
+
+## M6 exit (2026-11-11)
+
+The owner approved M5 and authorized audio transcription only. The result is `docs/M6_EXIT_REPORT.md`.
+
+- Audio uploads and the recorder's webm/ogg/mp4 files are accepted only after a signature check. Files over 25 MB are rejected. The original recording is stored and served through the existing signed file URL, including byte ranges for playback.
+- Groq `whisper-large-v3-turbo` (or `whisper-large-v3`) runs as one poll step. The adapter stays off unless `GROQ_API_KEY` is set and `KNOWFLOW_GROQ_ZDR=true`. HTTP 429 stops with no paid fallback. Transcripts enter the existing classify, task, embed, and meeting paths. A transcript edit uses the same stale-chunk and stale-summary behavior as a text edit.
+- `GET /capabilities` advertises audio MIME types, the audio capture source, a 15-minute recording limit, and `transcription: true` only when that adapter is configured. Whisper is not marked as an answer model.
+- Full local pytest: **47 passed, 1 warning**. No live Groq call.
+
+## M7 exit (2026-11-11)
+
+The owner approved M6 and authorized visual retrieval only. The result is `docs/M7_EXIT_REPORT.md`.
+
+- Page images are embedded with `gemini-embedding-2`, 768 dimensions, one region per poll. Those vectors live in `visual_regions`, not in the text `document_chunks.embedding` column. Text remains `gemini-embedding-001`. The spaces are not mixed.
+- An optional query image is accepted on the existing async assistant job only when that visual adapter is configured. Retrieval is filtered by owner, accepted grant, and selected document ids before the prompt. Cited regions are normalized boxes from the stored page. Weak or missing evidence abstains.
+- `capabilities.multimodal` is true only when the visual adapter is configured. Whisper and the visual model are not answer models.
+- Full local pytest: **53 passed, 1 warning**. No live Gemini or Groq call. No Render memory or latency measurement.
+
+## M8 exit (2026-11-11)
+
+The owner approved M7 and authorized selected-document sharing only. The result is `docs/M8_EXIT_REPORT.md`.
+
+- The owner invites by normalized email, lists grants, changes view/edit, and revokes. Self-sharing and a second live grant are rejected. Only the owner manages grants. Admin does not bypass that.
+- A pending invitation exposes the title and owner name, not the text, files, meeting, siblings, or tasks. Acceptance requires the verified account for that email. Declined and expired invitations grant nothing. Pending invitations last 7 days; that duration is not in the contract.
+- View can read and retrieve. Edit can correct title, type, tags, and text. Neither can reshare or manage grants. There is no document-delete route.
+- Revocation and downgrade take effect on the next document, timeline, task, and retrieval request. A saved answer derived from a revoked source is replaced, not merely unlinked. An already-issued file URL remains valid until its 60-second expiry, which is the M0 rule. A downloaded copy cannot be recalled.
+- Full local pytest: **56 passed, 1 warning**. No provider call.
+
+## M9 exit (2026-11-11)
+
+The owner approved M8 and authorized measured personal analytics only. The result is `docs/M9_EXIT_REPORT.md`.
+
+- `GET /analytics` returns current owned-document and task counts, 7/30/90-day activity, and tagged-document topic counts. Topic coverage is not mastery. Day boundaries use the requested IANA timezone. If the caller omits it, the day is UTC, because the published Dashboard does not send a timezone yet.
+- A task contributes at most one completion, on the day of its latest completion, and only while it is still completed. Repeating complete does not add another event. Reopen removes it. Recomplete moves that single count.
+- Study time is an explicit Start, Pause, Resume, and Stop timer. The server stores confirmed intervals. A missed 90-second heartbeat pauses at the last confirmed time and does not credit the gap. Page views are not study time. `studyMinutes` is null when the period has no confirmed seconds.
+- Full local pytest: **61 passed, 1 warning**. No provider call.
+
+## Contract sync (2026-11-11)
+
+The owner approved M9 and authorized contract synchronization before M10. This is local and uncommitted. Nothing was deployed.
+
+- `frontend/src/api/types.ts` now has `QueryJob`, `StudySession`, and `StudySessionState`. `docs/openapi.json` was regenerated from `frontend/scripts/generate-contract.mjs`. It publishes `POST /auth/email-verifications/confirm`, assistant `202` plus poll and cancel, study Start/Pause/Resume/Stop/heartbeat/history/delete, and analytics `timezone`. `days` is 7, 30, or 90.
+- Login keeps the restored card, shader, network, and reduced-motion path. Registration with `user: null` opens a pending-verification form. Confirmation still does not sign the user in.
+- Assistant posts a question, polls `GET /assistant/queries/{id}`, and can cancel. It no longer expects an immediate `Answer`.
+- Dashboard sends the browser IANA timezone and shows Start, Pause, Resume, and Stop. Heartbeats use the server revision and do not submit elapsed time.
+- Frontend build, lint, `test:types`, vitest (30), and `contract:check` passed. `npm audit` still reports 2 high-severity dev advisories. They were not fixed. Playwright Chromium could not be installed: the Playwright download host and GitHub release-asset host are blocked here, and no system Chromium exists.
+- Live React dev server on port 5173 proxied `/api` to FastAPI on port 8000 with no fixture interception. Register, confirm, login, text capture, library retrieval, timezone analytics, study Start/Pause/Resume/Stop, share, accept, view isolation, and query cancel passed. A no-key assistant poll stayed on “Embedding a passage.” That limit is fixed in the section below. No Gemini or Groq call was made.
+
+## Pre-M10 local fixes (2026-11-11)
+
+The owner authorized these fixes before M10. They are local and uncommitted. Nothing was deployed, committed, or merged.
+
+- `embed_next_chunk` commits the vector write before it returns. A missing embedding key raises `Embedding is not configured.` and that failure is committed before the poll response is built. A provider rejection becomes a terminal `failed` job with the safe provider message. A later poll does not embed again and does not stay on “Embedding a passage.”
+- An ingestion index job with no embedding key fails with the same message. Capture without a key still saves the document; it does not pretend the passage was embedded. A configured embedder that rejects the call fails the assistant poll after one attempt.
+- Regression: `test_missing_key_and_failed_embedding_polls_are_terminal`. Full backend pytest: **62 passed, 1 warning in 54.87s**. The warning is Starlette’s `httpx` notice. No provider call.
+- Dev advisories were patched inside the existing major ranges: `happy-dom` 21.0.4 and `vite` 8.3.8. `npm audit` reports 0 vulnerabilities. No breaking major bump was required. Frontend build, lint, `test:types`, vitest (30), and `contract:check` passed.
+- Live React proxy to FastAPI, no fixture interception: register, confirm, login, text capture, then one assistant poll returned `failed` with `Embedding is not configured.` A second poll stayed failed. Playwright Chromium is still unavailable in this sandbox. M10 remains unauthorized.

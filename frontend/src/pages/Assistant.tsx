@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAction, useResource } from '../api/hooks';
-import { request, key } from '../api/client';
-import type { Answer, Capabilities, Conversation, Message, Page as PageData } from '../api/types';
+import { request, key, json } from '../api/client';
+import type {
+  Capabilities,
+  Conversation,
+  Message,
+  Page as PageData,
+  QueryJob,
+} from '../api/types';
 import {
   Page,
   Panel,
@@ -75,8 +81,12 @@ export function Assistant() {
   const [image, setImage] = useState<File | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [error, setError] = useState<Error | null>(null);
+  const [queryId, setQueryId] = useState<string | null>(null);
+  const [queryStage, setQueryStage] = useState('');
   const end = useRef<HTMLDivElement>(null);
   const keyRef = useRef<string | null>(null);
+  const finished = useRef<string | null>(null);
+  const query = useResource<QueryJob>(queryId ? `/assistant/queries/${key(queryId)}` : null, true);
   useEffect(() => {
     setMessages([]);
     keyRef.current = null;
@@ -89,9 +99,47 @@ export function Assistant() {
   }, [selected.data]);
   useEffect(() => {
     end.current?.scrollIntoView?.({ block: 'nearest', behavior: 'instant' });
-  }, [messages.length, action.pending]);
+  }, [messages.length, action.pending, query.data?.status]);
+  useEffect(() => {
+    const job = query.data;
+    if (!job || finished.current === job.id) return;
+    setQueryStage(job.stage);
+    if (job.status === 'queued' || job.status === 'running') return;
+    finished.current = job.id;
+    setQueryId(null);
+    if (job.status === 'succeeded' && job.answer) {
+      const answer = job.answer;
+      setMessages((previous) => {
+        const ids = new Set(previous.map((message) => message.id));
+        return [
+          ...previous,
+          ...(ids.has(answer.userMessage.id) ? [] : [answer.userMessage]),
+          ...(ids.has(answer.answer.id) ? [] : [answer.answer]),
+        ];
+      });
+      setInput('');
+      setImage(null);
+      keyRef.current = null;
+      if (conversationId !== answer.conversationId)
+        setParams((previous) => {
+          const next = new URLSearchParams(previous);
+          next.set('conversationId', answer.conversationId);
+          return next;
+        });
+      else selected.reload();
+      history.reload();
+      return;
+    }
+    if (job.status === 'cancelled') {
+      keyRef.current = null;
+      setError(new Error(job.stage || 'The question was cancelled before an answer was saved.'));
+      return;
+    }
+    setError(new Error(job.error || 'The question could not be answered from the available sources.'));
+  }, [query.data, conversationId, history, selected, setParams]);
+  const waiting = action.pending || queryId !== null;
   const send = () => {
-    if (!input.trim() || action.pending) return;
+    if (!input.trim() || waiting) return;
     setError(null);
     if (!caps.data) {
       setError(new Error('Model capabilities are not available. Retry loading the service.'));
@@ -114,25 +162,37 @@ export function Assistant() {
     keyRef.current ||= crypto.randomUUID();
     void action.run(
       (signal) =>
-        request<Answer>('/assistant/query', {
+        request<QueryJob>('/assistant/query', {
           method: 'POST',
           body: data,
           signal,
           headers: { 'Idempotency-Key': keyRef.current! },
         }),
-      (response) => {
-        setMessages((previous) => [...previous, response.userMessage, response.answer]);
-        setInput('');
-        setImage(null);
-        keyRef.current = null;
-        if (conversationId !== response.conversationId)
+      (job) => {
+        finished.current = null;
+        setQueryStage(job.stage);
+        setQueryId(job.id);
+        if (job.conversationId && conversationId !== job.conversationId)
           setParams((previous) => {
             const next = new URLSearchParams(previous);
-            next.set('conversationId', response.conversationId);
+            next.set('conversationId', job.conversationId!);
             return next;
           });
-        else selected.reload();
-        history.reload();
+      },
+    );
+  };
+  const cancel = () => {
+    if (!queryId || action.pending) return;
+    void action.run(
+      (signal) =>
+        request<QueryJob>(`/assistant/queries/${key(queryId)}/cancel`, {
+          ...json('POST'),
+          signal,
+          headers: { 'Idempotency-Key': crypto.randomUUID() },
+        }),
+      (job) => {
+        finished.current = null;
+        setQueryId(job.id);
       },
     );
   };
@@ -149,7 +209,7 @@ export function Assistant() {
                 id="conversation"
                 className={fieldClass}
                 value={conversationId || ''}
-                disabled={action.pending}
+                disabled={waiting}
                 onChange={(e) => {
                   action.clear();
                   setParams((previous) => {
@@ -174,7 +234,7 @@ export function Assistant() {
           </div>
           <Button
             variant="secondary"
-            disabled={action.pending}
+            disabled={waiting}
             onClick={() => {
               setParams((previous) => {
                 const next = new URLSearchParams(previous);
@@ -210,7 +270,7 @@ export function Assistant() {
             .{' '}
             <Button
               variant="ghost"
-              disabled={action.pending}
+              disabled={waiting}
               onClick={() =>
                 setParams((previous) => {
                   const next = new URLSearchParams(previous);
@@ -243,8 +303,8 @@ export function Assistant() {
         <div ref={end} />
       </section>
       <Notice>
-        {action.pending
-          ? 'Retrieving evidence and preparing an answer…'
+        {waiting
+          ? queryStage || 'The question was accepted. Checking authorized sources…'
           : messages.at(-1)?.role === 'assistant'
             ? 'Answer ready. Review its sources in the conversation.'
             : ''}
@@ -275,7 +335,7 @@ export function Assistant() {
                   send();
                 }
               }}
-              disabled={action.pending}
+              disabled={waiting}
             />
           </Field>
           <Field
@@ -287,7 +347,7 @@ export function Assistant() {
               id="query-image"
               type="file"
               accept="image/png,image/jpeg,image/webp"
-              disabled={!caps.data?.multimodal || action.pending}
+              disabled={!caps.data?.multimodal || waiting}
               aria-describedby="query-image-hint"
               className="w-full max-w-full text-sm"
               onChange={(e) => {
@@ -312,7 +372,7 @@ export function Assistant() {
               Attached: {image.name}{' '}
               <Button
                 variant="ghost"
-                disabled={action.pending}
+                disabled={waiting}
                 onClick={() => {
                   setImage(null);
                   keyRef.current = null;
@@ -331,11 +391,16 @@ export function Assistant() {
           <Button
             type="submit"
             disabled={
-              !input.trim() || action.pending || !caps.data || selected.loading || !!selected.error
+              !input.trim() || waiting || !caps.data || selected.loading || !!selected.error
             }
           >
-            {action.pending ? 'Waiting for answer…' : 'Send question'}
+            {waiting ? 'Waiting for answer…' : 'Send question'}
           </Button>
+          {queryId && (
+            <Button type="button" variant="secondary" disabled={action.pending} onClick={cancel}>
+              Cancel question
+            </Button>
+          )}
         </form>
       </Panel>
     </Page>

@@ -94,6 +94,14 @@ export type Message = {
 };
 export type Conversation = { id: string; title: string; updatedAt: string; messages: Message[] };
 export type Answer = { conversationId: string; userMessage: Message; answer: Message };
+export type QueryJob = {
+  id: string;
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+  stage: string;
+  conversationId: string | null;
+  answer: Answer | null;
+  error: string | null;
+};
 export type TimelineEvent = {
   id: string;
   occurredAt: string;
@@ -118,6 +126,20 @@ export type Analytics = {
   activity: { date: string; documents: number; completedTasks: number }[];
   period: { from: string; to: string };
 };
+export type StudySession = {
+  id: string;
+  status: 'active' | 'paused' | 'completed';
+  startedAt: string;
+  stoppedAt: string | null;
+  confirmedThrough: string;
+  measuredSeconds: number;
+  leaseExpiresAt: string | null;
+  pauseReason: 'manual' | 'connection_lost' | null;
+  stopReason: 'manual' | 'safety_cap' | null;
+  documentId: string | null;
+  revision: number;
+};
+export type StudySessionState = { session: StudySession | null; serverTime: string };
 export type AdminConfig = {
   storageLimitBytes: number;
   defaultModelId: string | null;

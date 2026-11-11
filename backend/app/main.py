@@ -17,9 +17,14 @@ from app.errors import error_response
 from app.identity import promote_configured_admins
 from app.models import ServiceConfig
 from app.catalog import DEFAULT_STORAGE_LIMIT, KNOWN_SOURCES
-from app.routers import admin, auth, capabilities, capture, library, onboarding, session, settings as settings_router
+from app.classify import build_analyst
+from app.embeddings import build_embedder
+from app.generate import build_generator
+from app.routers import admin, analytics, auth, capabilities, capture, library, onboarding, session, settings as settings_router, shares, study, tasks, assistant, meetings
+from app.speech import build_speech
 from app.storage import build_store
 from app.transcribe import build_transcriber
+from app.visual import build_visual
 
 logger = logging.getLogger("knowflow.verification")
 
@@ -64,13 +69,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.sessionmaker = factory
     app.state.store = build_store(settings)
     app.state.transcriber = build_transcriber(settings.gemini_api_key, settings.gemini_model)
+    app.state.speech = build_speech(settings.groq_api_key, settings.groq_model, settings.groq_zdr)
+    app.state.classifier = build_analyst(settings.gemini_api_key, settings.gemini_model)
+    app.state.embedder = build_embedder(settings.gemini_api_key)
+    app.state.visual = build_visual(settings.gemini_api_key)
+    app.state.generator = build_generator(settings.gemini_api_key, settings.gemini_model)
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=sorted(settings.origins),
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Accept", "Content-Type", "X-CSRF-Token", "X-Request-Id"],
+        allow_headers=["Accept", "Content-Type", "Idempotency-Key", "If-Match", "X-CSRF-Token", "X-Request-Id"],
     )
 
     @app.middleware("http")
@@ -118,7 +128,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def healthz():
         return {"status": "ok"}
 
-    for module in (session, auth, settings_router, capabilities, admin, onboarding, capture, library):
+    for module in (session, auth, settings_router, capabilities, admin, onboarding, capture, library, tasks, assistant, meetings, shares, analytics, study):
         app.include_router(module.router, prefix="/api/v1")
 
     return app
