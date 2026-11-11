@@ -1,14 +1,14 @@
 # KnowFlow Project Memory
 
-_Read this first. Updated for Phase 5 planning on 2026-10-15._
+_Read this first. Updated when M0 was closed on 2026-11-10._
 
 ## Authority and approved scope
 
 - Personal knowledge/productivity project. The BRD PDF in the repository wins over README/design exports and earlier “enterprise” language.
-- User requested five gated phases. Phases 1–3 (understanding, grouped doubts, read-only audit) were completed before edits. Phase 4 was explicitly approved for **all 41 findings/all four groups**, including every BRD future feature. **Phase 5 planning was subsequently approved and completed; stop for review before implementation.** No backend implementation or deployment is authorized by the planning phase.
+- User requested five gated phases. Phases 1–3 (understanding, grouped doubts, read-only audit) were completed before edits. Phase 4 was explicitly approved for **all 41 findings/all four groups**, including every BRD future feature. Phase 5 planning is approved in principle and Milestone M0 is closed in `docs/M0_DECISION_RECORD.md`. M1 was later authorized and its exit result is in `docs/M1_EXIT_REPORT.md`. M2 is implemented locally; its exit result is in `docs/M2_EXIT_REPORT.md` and awaits approval. Contract edits, deployment, and a `main` merge are not authorized. M3+ is not authorized.
 - Full required frontend, not an MVP: authentication/User/Admin, ingestion/camera/OCR-review UI, classification corrections, meetings, tasks, library/timeline, grounded assistant, settings/onboarding, audio transcription UI, multimodal query/citation UI, collaboration and personal analytics.
 - BRD §14 p8 says “Collaborative use cases (sharing workspaces with classmates or team members).” This was quoted and clarified with the user. The explicit answer was **selected-document sharing with permission control, not shared workspaces**. Implemented owner/view/edit grants, recipient invitations and revocation UI.
-- Netlify frontend; Render backend later. No AI provider chosen. Browser configuration contains public API settings only; backend owns credentials/adapters/storage/ML.
+- Netlify frontend; Render free web service approved for the backend. Gemini and Groq are approved only for the uses and non-sensitive data named in `docs/M0_DECISION_RECORD.md`. Browser configuration contains public API settings only; the backend owns credentials, adapters, storage, and ML.
 - Keep existing React/browser runtime stack. No Zustand/Query/Zod/form-library additions. Production-grade accessibility/error handling/responsiveness are requirements, not unverified claims of certification.
 - The user explicitly approved development-only regression tools, as devDependencies only, with exact additions/reasons recorded here. Do not commit/push unless asked.
 
@@ -126,3 +126,45 @@ The owner approved the Phase 5 roadmap **in principle** and authorized M0 recomm
 ## Planning documents published at owner request
 
 The owner asked to push the latest code before giving the next instruction. This publication contains only the Phase 5 roadmap, the M0 decision proposal, and the related memory, README, and architecture notes. It does not approve D1–D6, change application code or existing contracts, install backend packages, deploy, or merge `main`.
+
+## M0 amended to $0 and feasibility baseline (2026-11-10)
+
+The owner first approved the paid M0 recommendations, then amended them before implementation. The amendment is authoritative:
+
+- Strict monthly ceiling is **$0**. No card, auto-recharge, or paid fallback.
+- D1: one free-tier FastAPI service and in-process asynchronous work, not a paid separate worker.
+- D2: Cloudflare R2; pgvector on free Postgres, with Qdrant Cloud free only if the database cannot hold the index; database-backed jobs.
+- D3: local OpenCV/Tesseract; Google Gemini free tier for generation and multimodal questions; Groq free Whisper. Selected excerpts, query images, and audio may leave the app for those two providers.
+- D4: verification logic remains; local and free staging print activation links to logs because there is no paid sending domain.
+- D5: explicit server-recorded study timer approved.
+- D6: presigned R2 uploads and async assistant calls approved because of Netlify's 26-second proxy timeout.
+
+`docs/M0_FREE_TIER_FEASIBILITY.md` records the official limits checked on 2026-11-10 and the evaluation baseline. No packages were installed, no provider was called, and no existing contract was edited.
+
+- Feasible at $0: a small personal functional baseline. Not feasible: always-on processing, the 3,000-document envelope, warm few-second answers after idle, reliable local handwriting, 24-hour recovery, or production email.
+- Recommended $0 combination, still not deployed: Render free web (512 MB, 15-minute sleep, 750 hours), Neon Free Postgres with pgvector (1 GB, 100 CU-hours, 5-minute scale-to-zero), R2 Standard free tier, Gemini's current free Flash model, and Groq Whisper with Zero Data Retention. Render free Postgres is rejected because it expires after 30 days. New Hugging Face Docker/Gradio Spaces require a paid plan.
+- Free Gemini content is documented as used to improve Google's products. That is broader than the owner's consent and blocks any Gemini call until explicitly accepted or rejected. Groq is not documented as training on customer data, but abuse/reliability logs can last 30 days unless ZDR is enabled.
+- Embeddings and handwriting are open. Lexical Postgres search is the measured retrieval baseline until a local model is profiled or whole-library embedding consent is given. Do not treat that as completion of semantic or visual retrieval.
+- Jobs must be Postgres-backed and advanced one short unit per poll. In-memory background tasks die on free-tier sleep. Streaming does not defeat the Netlify proxy timeout.
+- Implementation remains unauthorized at the time of that feasibility note. The four open choices were later closed; see the section below.
+
+## M0 closed (2026-11-10)
+
+The owner accepted the $0 trade-offs and closed M0. The authority is `docs/M0_DECISION_RECORD.md`. The proposal and feasibility documents are historical evidence, not open decisions.
+
+- Google free-tier product-improvement terms are accepted for personal/academic evaluation of non-sensitive test documents and synthetic data only.
+- Text chunks may go to Google's free embedding API. `text-embedding-004` is not the pin: official deprecations show it shut down on 14 January 2026. The recorded pin is `gemini-embedding-001`, 768 dimensions, `RETRIEVAL_DOCUMENT` / `RETRIEVAL_QUERY`, one chunk per request, stored in Neon pgvector. `gemini-embedding-2` is only a new index version if 001 is unavailable. Page images are not embedded under this decision.
+- OpenCV does local boundary detection, perspective correction, and contrast enhancement. Gemini Vision transcribes printed and handwritten pages. Tesseract is not the approved transcription engine.
+- Host is confirmed: one Render free FastAPI service, Neon Free with pgvector, and R2. Jobs are database-backed and advanced one short poll at a time. Assistant calls are asynchronous. Email verification stays log-only for local development and free staging.
+- The evaluation baseline is specified and approved as a report-only measurement plan. It has not been executed. The 3,000-document envelope, always-on latency, 24-hour recovery, and production email remain unmet at $0 and are not permission to cut features.
+- No package was installed and no existing frontend contract was edited at M0 close. M1 was authorized afterward; see the section below.
+
+## M1 exit (2026-11-11)
+
+The owner authorized the trusted-service foundation only. The result is `docs/M1_EXIT_REPORT.md`.
+
+- One FastAPI app, SQLAlchemy, and Alembic live under `backend/`. Tests use a temporary SQLite file. Neon was not connected, and nothing was deployed.
+- `POST /auth/register` returns the published `201 Session` shape with `user: null`. An unverified account does not receive an authenticated session. The one-time token is printed to stdout. `POST /auth/email-verifications/confirm` is the handoff redemption path and is not in the frozen frontend operation list.
+- Isolated pytest result: **14 passed, 1 warning**. The warning is Starlette's deprecation of `httpx` with `TestClient`. No Gemini, Groq, or file-processing call exists in this milestone.
+- The published Login page will not explain the log token, because a successful `Session` has no message field and the frontend was not edited. That integration gap remains.
+- This work is local and uncommitted. `origin/arena/d9bd44f3-knowflow` remains `f925831`. `main` was not changed.

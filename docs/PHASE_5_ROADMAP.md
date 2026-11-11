@@ -2,7 +2,7 @@
 
 **Date:** 15 October 2026  
 **Baseline reviewed:** `1df6b73` on `arena/d9bd44f3-knowflow`  
-**Status:** Planning deliverable complete; proposed execution plan awaits approval. Backend implementation, new dependencies, deployment and publication of this plan are not authorized by starting Phase 5.
+**Status:** Roadmap approved in principle. Milestone M0 is closed by `docs/M0_DECISION_RECORD.md` (10 November 2026). Later milestones still require separate implementation authorization. The $0 decisions in that record supersede the open D1–D6 recommendations below.
 
 ## 1. Scope and evidence
 

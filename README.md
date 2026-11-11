@@ -8,7 +8,7 @@ The repository's **Business Requirements Document** (`BRD  Intelligent Personal 
 
 **Phase 4 implements the API-connected frontend and backend contract.** The backend has not been implemented or deployed. There is no simulated production login, local mock persistence, fake OCR, timer-generated answer, or fabricated analytics. Without the service, the UI reports unavailability. Test fixtures exist only in test files.
 
-Selected-document sharing with view/edit permissions was explicitly chosen after reviewing BRD §14; there are **no shared workspaces**. The [Phase 5 roadmap](docs/PHASE_5_ROADMAP.md) is delivered for review; backend implementation and deployment still require separate approval.
+Selected-document sharing with view/edit permissions was explicitly chosen after reviewing BRD §14; there are **no shared workspaces**. The [Phase 5 roadmap](docs/PHASE_5_ROADMAP.md) is approved in principle. Milestone M0 is closed in the [M0 decision record](docs/M0_DECISION_RECORD.md): a $0 Render, Neon, R2, Gemini, and Groq baseline. Backend implementation and deployment still require separate approval.
 
 ## Feature coverage
 
