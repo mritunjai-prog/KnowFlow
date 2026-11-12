@@ -140,7 +140,6 @@ def login(body: LoginInput, request: Request, response: Response):
         return error_response(401, "INVALID_CREDENTIALS", "The email or password is incorrect.", request)
     if actor.record is not None:
         revoke(actor.record)
-    revoke_other_sessions(db, user.id, None)
     record, cookie, csrf = bind_user_session(db, settings, user)
     set_session_cookie(response, cookie, record.expires_at, settings)
     return session_out(user, csrf)

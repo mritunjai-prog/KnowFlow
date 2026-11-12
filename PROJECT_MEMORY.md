@@ -1,11 +1,11 @@
 # KnowFlow Project Memory
 
-_Read this first. Updated when the pre-M10 embedding and audit fixes were applied locally on 2026-11-11._
+_Read this first. Updated when the pre-M10 session, verification-link, and contract line-ending fixes were published on 2026-11-11. M10 and a `main` merge are not authorized._
 
 ## Authority and approved scope
 
 - Personal knowledge/productivity project. The BRD PDF in the repository wins over README/design exports and earlier “enterprise” language.
-- User requested five gated phases. Phases 1–3 (understanding, grouped doubts, read-only audit) were completed before edits. Phase 4 was explicitly approved for **all 41 findings/all four groups**, including every BRD future feature. Phase 5 planning is approved in principle and Milestone M0 is closed in `docs/M0_DECISION_RECORD.md`. M1–M9 exits are approved. M2 is the last pushed commit. M3–M9 and the later contract sync remain unpushed. The owner authorized the M1/M4/M7/M9 contract and frontend sync, then the pre-M10 embedding and audit fixes. Deployment and a `main` merge are not authorized.
+- User requested five gated phases. Phases 1–3 (understanding, grouped doubts, read-only audit) were completed before edits. Phase 4 was explicitly approved for **all 41 findings/all four groups**, including every BRD future feature. Phase 5 planning is approved in principle and Milestone M0 is closed in `docs/M0_DECISION_RECORD.md`. M1–M9 exits are approved and published on `arena/d9bd44f3-knowflow`, including the contract sync, the embedding-failure fix, and the session, verification-link, and contract line-ending follow-up. Deployment and a `main` merge are not authorized.
 - Full required frontend, not an MVP: authentication/User/Admin, ingestion/camera/OCR-review UI, classification corrections, meetings, tasks, library/timeline, grounded assistant, settings/onboarding, audio transcription UI, multimodal query/citation UI, collaboration and personal analytics.
 - BRD §14 p8 says “Collaborative use cases (sharing workspaces with classmates or team members).” This was quoted and clarified with the user. The explicit answer was **selected-document sharing with permission control, not shared workspaces**. Implemented owner/view/edit grants, recipient invitations and revocation UI.
 - Netlify frontend; Render free web service approved for the backend. Gemini and Groq are approved only for the uses and non-sensitive data named in `docs/M0_DECISION_RECORD.md`. Browser configuration contains public API settings only; the backend owns credentials, adapters, storage, and ML.
@@ -236,3 +236,12 @@ The owner authorized these fixes before M10. They are local and uncommitted. Not
 - Regression: `test_missing_key_and_failed_embedding_polls_are_terminal`. Full backend pytest: **62 passed, 1 warning in 54.87s**. The warning is Starlette’s `httpx` notice. No provider call.
 - Dev advisories were patched inside the existing major ranges: `happy-dom` 21.0.4 and `vite` 8.3.8. `npm audit` reports 0 vulnerabilities. No breaking major bump was required. Frontend build, lint, `test:types`, vitest (30), and `contract:check` passed.
 - Live React proxy to FastAPI, no fixture interception: register, confirm, login, text capture, then one assistant poll returned `failed` with `Embedding is not configured.` A second poll stayed failed. Playwright Chromium is still unavailable in this sandbox. M10 remains unauthorized.
+
+## Pre-M10 TestSprite follow-up (2026-11-11)
+
+Published on `arena/d9bd44f3-knowflow`. Not merged to `main`. M10 is not authorized.
+
+- Login rotates only the current session. It no longer calls `revoke_other_sessions`. Password change and verified email change still revoke the other sessions. A second device stays signed in until one of those changes.
+- Sign-in has “Have a verification token? Confirm email”. It opens the existing confirmation card and does not add a second form. Login visuals are unchanged.
+- `docs/openapi.json` is LF in `.gitattributes`. `contract:check` also ignores CRLF so a Windows checkout does not report false drift.
+- Full pytest: **63 passed, 1 warning in 44.50s**. Frontend build, lint, `test:types`, vitest (**31**), `contract:check`, and `npm audit` (0) passed. A CRLF copy of `docs/openapi.json` still passed `contract:check`. Live proxy: two logins stayed valid, a laptop mutation succeeded, and password change revoked only the other session.

@@ -98,6 +98,16 @@ test('flip retains one form, transfers focus, clears passwords and preserves ser
   ).toBe('test-csrf');
 });
 
+test('sign-in can open the saved verification token form', async ({ page }) => {
+  await installApi(page, 'anonymous');
+  await page.goto('/login');
+  await page.getByRole('button', { name: 'Have a verification token? Confirm email' }).click();
+  await expect(page.getByRole('heading', { name: 'Confirm your email' })).toBeFocused();
+  await expect(page.locator('form')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toHaveCount(0);
+  await expect(page.locator('[data-login-shader]')).toHaveCount(1);
+});
+
 test('reduced motion is static and responds immediately to preference changes', async ({
   page,
 }) => {

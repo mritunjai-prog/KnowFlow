@@ -144,6 +144,62 @@ def test_login_logout_password_and_other_session_revocation(client, app, caplog)
     assert client.get("/api/v1/settings").status_code == 401
 
 
+def test_second_login_keeps_an_independent_session_until_password_change(client, app, caplog):
+    from fastapi.testclient import TestClient
+
+    register_and_verify(client, caplog)
+    bootstrap(client)
+    first = client.post("/api/v1/auth/login", json={"email": "ada@example.com", "password": PASSWORD})
+    assert first.status_code == 200, first.text
+    first_cookie = first.cookies.get("knowflow_session")
+    assert first_cookie
+    client.headers["X-CSRF-Token"] = first.json()["csrfToken"]
+
+    phone = TestClient(app)
+    phone.__enter__()
+    try:
+        phone.headers["Origin"] = "http://test.example"
+        phone.headers["X-CSRF-Token"] = phone.get("/api/v1/session").json()["csrfToken"]
+        second = phone.post("/api/v1/auth/login", json={"email": "ada@example.com", "password": PASSWORD})
+        assert second.status_code == 200, second.text
+        phone.headers["X-CSRF-Token"] = second.json()["csrfToken"]
+        assert phone.cookies.get("knowflow_session") != first_cookie
+        assert client.get("/api/v1/settings").status_code == 200
+        assert phone.get("/api/v1/settings").status_code == 200
+        laptop_note = client.post(
+            "/api/v1/study-sessions",
+            json={},
+            headers={"Idempotency-Key": "laptop-session"},
+        )
+        assert laptop_note.status_code == 201, laptop_note.text
+
+        client.headers["X-CSRF-Token"] = client.get("/api/v1/session").json()["csrfToken"]
+        rotated = client.post("/api/v1/auth/login", json={"email": "ada@example.com", "password": PASSWORD})
+        assert rotated.status_code == 200, rotated.text
+        assert rotated.cookies.get("knowflow_session") != first_cookie
+        client.headers["X-CSRF-Token"] = rotated.json()["csrfToken"]
+        assert client.get("/api/v1/settings").status_code == 200
+        assert phone.get("/api/v1/settings").status_code == 200
+        retired = TestClient(app)
+        retired.__enter__()
+        try:
+            retired.headers["Origin"] = "http://test.example"
+            blocked = retired.get("/api/v1/settings", headers={"Cookie": f"knowflow_session={first_cookie}"})
+            assert blocked.status_code == 401, blocked.text
+        finally:
+            retired.__exit__(None, None, None)
+
+        changed = phone.put(
+            "/api/v1/auth/password",
+            json={"currentPassword": PASSWORD, "newPassword": "different-horse-2"},
+        )
+        assert changed.status_code == 204, changed.text
+        assert phone.get("/api/v1/settings").status_code == 200
+        assert client.get("/api/v1/settings").status_code == 401
+    finally:
+        phone.__exit__(None, None, None)
+
+
 def test_verified_account_survives_a_new_process(database_url, caplog):
     import logging
 

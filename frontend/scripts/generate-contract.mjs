@@ -631,7 +631,8 @@ const contract = {
 const target = new URL('../../docs/openapi.json', import.meta.url);
 const output = JSON.stringify(contract, null, 2) + '\n';
 if (process.argv.includes('--check')) {
-  if (readFileSync(target, 'utf8') !== output) {
+  const stored = readFileSync(target, 'utf8').replace(/\r\n/g, '\n');
+  if (stored !== output) {
     console.error('Contract drift: run npm run contract:generate');
     process.exitCode = 1;
   } else console.log('Contract is synchronized with TypeScript DTOs and operation definitions.');

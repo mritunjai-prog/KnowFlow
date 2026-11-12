@@ -367,6 +367,16 @@ export function Login() {
                     : 'New to KnowFlow? Create an account'}
                 </Button>
               )}
+              {!register && !pendingVerification && (
+                <Button
+                  variant="ghost"
+                  className="w-full text-sm font-normal text-primary/80"
+                  disabled={action.pending}
+                  onClick={showPending}
+                >
+                  Have a verification token? Confirm email
+                </Button>
+              )}
               {confirmed && !auth.user && (
                 <p className="mt-4 text-sm" role="status">
                   Email confirmed. No user is signed in. Sign in with the same email and password.
